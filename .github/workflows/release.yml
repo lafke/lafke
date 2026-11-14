@@ -45,8 +45,39 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: lafke/engine
+          path: engine
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            engine/go.sum
+      - name: SPDX SBOMs
+        run: |
+          go build -o "$RUNNER_TEMP/lafke" ./cmd/lafke
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          mkdir dist
+          "$RUNNER_TEMP/lafke" lock . --offline --no-fail
+          "$RUNNER_TEMP/lafke" sbom export . --spec spdx --offline > dist/lafke.spdx.json
+          "$RUNNER_TEMP/lafke" lock engine --offline --no-fail
+          "$RUNNER_TEMP/lafke" sbom export engine --spec spdx --offline > dist/lafke-engine.spdx.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-sbom
+          path: dist/*
+          if-no-files-found: error
+
   publish:
-    needs: package
+    needs: [package, sbom]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -60,7 +91,15 @@ jobs:
           path: dist
       - name: Checksums
         working-directory: dist
-        run: sha256sum lafke_* > checksums.txt
+        run: sha256sum lafke* > checksums.txt
+      - name: Extract binaries
+        run: |
+          for a in dist/*.tar.gz; do
+            d="bin/$(basename "$a" .tar.gz)"; mkdir -p "$d"; tar -xzf "$a" -C "$d"
+          done
+          for a in dist/*.zip; do
+            d="bin/$(basename "$a" .zip)"; mkdir -p "$d"; unzip -q "$a" -d "$d"
+          done
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -68,6 +107,11 @@ jobs:
             dist/checksums.txt
             dist/*.tar.gz
             dist/*.zip
+            dist/*.spdx.json
+            bin/*/lafke
+            bin/*/lafke-engine
+            bin/*/lafke.exe
+            bin/*/lafke-engine.exe
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -77,4 +121,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "$TAG" \
             --generate-notes \
-            --verify-tag
+            --verify-tag \
+            --draft
+          # Immutable releases lock assets at publish, so everything is attached to the draft first.
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
