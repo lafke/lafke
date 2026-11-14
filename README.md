@@ -16,13 +16,17 @@ never uploaded.
 ```sh
 curl -fsSL https://lafke.sh/install | sh
 # a specific version
-curl -fsSL https://lafke.sh/install | sh -s -- --version v0.1.0
+curl -fsSL https://lafke.sh/install | sh -s -- --version v0.1.1
 ```
 
 The installer supports macOS and Linux (amd64 and arm64), checks the SHA-256 of the
-download, and installs to `/usr/local/bin` or, if that is not writable, `~/.local/bin`.
-Set `INSTALL_DIR` to choose another directory. Windows builds are published as zip
-archives on the [releases page](https://github.com/lafke/lafke/releases).
+download, verifies its GitHub attestation, and installs to `/usr/local/bin` or, if that is
+not writable, `~/.local/bin`. Set `INSTALL_DIR` to choose another directory.
+
+Attestation verification needs the [GitHub CLI](https://cli.github.com) (`gh`), signed in
+with `gh auth login`; without it the installer stops. Pass `--skip-attestation` to install
+without verifying. Windows builds are published as zip archives on the
+[releases page](https://github.com/lafke/lafke/releases).
 
 Each release archive holds two executables that belong together:
 

@@ -6,12 +6,17 @@ BINARY="${BINARY:-lafke}"
 ENGINE_BINARY="${ENGINE_BINARY:-lafke-engine}"
 INSTALL_DIR="${INSTALL_DIR:-}"
 VERSION="${VERSION:-}"
+SKIP_ATTESTATION="${SKIP_ATTESTATION:-}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --version)
       VERSION=$2
       shift 2
+      ;;
+    --skip-attestation)
+      SKIP_ATTESTATION=1
+      shift
       ;;
     *)
       echo "unknown argument: $1" >&2
@@ -148,23 +153,36 @@ fi
 
 say "checksum ok: sha256:${got}"
 
-# With gh available, the archive must also carry a valid GitHub attestation from REPO.
-if command -v gh >/dev/null 2>&1; then
-  if gh auth status >/dev/null 2>&1; then
-    say "verifying attestation from ${REPO}"
-    if ! gh attestation verify "${tmp}/${archive}" --repo "$REPO"; then
-      echo "attestation verification failed for ${archive}" >&2
-      exit 1
-    fi
-    say "attestation ok"
-  else
-    say "attestation not verified: gh is not authenticated"
+verify_attestation() {
+  if ! gh attestation verify "$1" --repo "$REPO"; then
+    echo "attestation verification failed for $2" >&2
+    echo "if gh is not signed in, run: gh auth login" >&2
+    exit 1
   fi
+}
+
+# The archive and the executables in it must carry a valid GitHub attestation from REPO.
+# Nothing is installed until they do.
+if [ -n "$SKIP_ATTESTATION" ]; then
+  echo "warning: attestation verification skipped" >&2
 else
-  say "attestation not verified: gh is not installed"
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "error: the GitHub CLI (gh) is required to verify provenance" >&2
+    echo "install gh, or pass --skip-attestation (SKIP_ATTESTATION=1) to install without it" >&2
+    exit 1
+  fi
+  say "verifying attestation from ${REPO}"
+  verify_attestation "${tmp}/${archive}" "$archive"
 fi
 
 tar -xzf "${tmp}/${archive}" -C "$tmp"
+
+if [ -z "$SKIP_ATTESTATION" ]; then
+  verify_attestation "${tmp}/${BINARY}" "$BINARY"
+  verify_attestation "${tmp}/${ENGINE_BINARY}" "$ENGINE_BINARY"
+  say "attestation ok"
+fi
+
 install -m 0755 "${tmp}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 install -m 0755 "${tmp}/${ENGINE_BINARY}" "${INSTALL_DIR}/${ENGINE_BINARY}"
 
