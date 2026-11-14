@@ -79,6 +79,13 @@ if [ -z "$INSTALL_DIR" ]; then
   fi
 fi
 
+say() {
+  printf '%s\n' "$*"
+}
+
+say "lafke ${VERSION} (${os}/${arch})"
+say "install dir: ${INSTALL_DIR}"
+
 mkdir -p "$INSTALL_DIR"
 
 tmp=$(mktemp -d)
@@ -122,6 +129,7 @@ sha256() {
   fi
 }
 
+say "downloading ${archive}"
 fetch_assets
 
 expected=$(awk -v name="$archive" '$2 == name { print $1; exit }' "${tmp}/checksums.txt")
@@ -138,22 +146,42 @@ if [ "$got" != "$expected" ]; then
   exit 1
 fi
 
+say "checksum ok: sha256:${got}"
+
 # With gh available, the archive must also carry a valid GitHub attestation from REPO.
 if command -v gh >/dev/null 2>&1; then
   if gh auth status >/dev/null 2>&1; then
-    if ! gh attestation verify "${tmp}/${archive}" --repo "$REPO" >"${tmp}/attestation.log" 2>&1; then
-      cat "${tmp}/attestation.log" >&2
+    say "verifying attestation from ${REPO}"
+    if ! gh attestation verify "${tmp}/${archive}" --repo "$REPO"; then
       echo "attestation verification failed for ${archive}" >&2
       exit 1
     fi
+    say "attestation ok"
   else
-    echo "gh is not authenticated; skipping attestation verification" >&2
+    say "attestation not verified: gh is not authenticated"
   fi
+else
+  say "attestation not verified: gh is not installed"
 fi
 
 tar -xzf "${tmp}/${archive}" -C "$tmp"
 install -m 0755 "${tmp}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 install -m 0755 "${tmp}/${ENGINE_BINARY}" "${INSTALL_DIR}/${ENGINE_BINARY}"
 
+say ""
+say "installed:"
+say "  ${INSTALL_DIR}/${BINARY}"
+say "  ${INSTALL_DIR}/${ENGINE_BINARY}"
+"${INSTALL_DIR}/${BINARY}" version
 
-echo "installed ${BINARY} and ${ENGINE_BINARY} ${VERSION} to ${INSTALL_DIR}"
+case ":${PATH}:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *)
+    say ""
+    say "${INSTALL_DIR} is not on your PATH; add it with:"
+    say "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+    ;;
+esac
+
+say ""
+say "get started: lafke --help"
