@@ -1,0 +1,209 @@
+package cli_test
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/lafke/cli/internal/cli"
+	"github.com/lafke/cli/schemas"
+)
+
+func TestScanOffline(t *testing.T) {
+	dir := filepath.Join("..", "ecosystem", "npm", "testdata")
+	root := cli.NewRoot("test", "none", "unknown")
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"scan", dir, "--offline", "--no-fail"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(buf.Bytes(), []byte("ecosystems  npm")) {
+		t.Fatalf("unexpected output:\n%s", buf.String())
+	}
+}
+
+func TestLockAndVerify(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join("..", "ecosystem", "npm", "testdata", "package-lock.json")
+	raw, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := cli.NewRoot("test", "none", "unknown")
+	root.SetArgs([]string{"lock", dir, "--offline", "--no-fail"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	root = cli.NewRoot("test", "none", "unknown")
+	out := &bytes.Buffer{}
+	root.SetOut(out)
+	root.SetArgs([]string{"verify", dir, "--offline"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("verify: %v\n%s", err, out.String())
+	}
+}
+
+func TestExamples(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("npm_config_registry", "")
+	t.Setenv("NPM_CONFIG_REGISTRY", "")
+
+	examples := []string{"npm", "pnpm", "yarn", "bun", "uv", "poetry", "go", "cargo"}
+	for _, name := range examples {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join("..", "..", "examples", name)
+			root := cli.NewRoot("test", "none", "unknown")
+			out := &bytes.Buffer{}
+			root.SetOut(out)
+			root.SetErr(out)
+			root.SetArgs([]string{"verify", dir, "--offline"})
+			if err := root.Execute(); err != nil {
+				t.Fatalf("examples/%s verify: %v\n%s", name, err, out.String())
+			}
+		})
+	}
+}
+
+func TestAuditOffline(t *testing.T) {
+	isolateHome(t)
+	dir := filepath.Join("..", "ecosystem", "npm", "testdata")
+
+	text := runCLI(t, "audit", dir, "--offline", "--no-fail")
+	if !bytes.Contains(text, []byte("findings")) {
+		t.Fatalf("unexpected output:\n%s", text)
+	}
+
+	js := runCLI(t, "audit", dir, "--offline", "--no-fail", "--format", "json")
+	if err := schemas.Validate("audit-report.schema.json", js); err != nil {
+		t.Fatalf("audit json:\n%s\n%v", js, err)
+	}
+
+	sarif := runCLI(t, "audit", dir, "--offline", "--no-fail", "--format", "sarif")
+	if !bytes.Contains(sarif, []byte(`"version": "2.1.0"`)) {
+		t.Fatalf("unexpected sarif:\n%s", sarif)
+	}
+}
+
+func TestAuditFailOn(t *testing.T) {
+	isolateHome(t)
+	dir := filepath.Join("..", "ecosystem", "npm", "testdata")
+
+	root := cli.NewRoot("test", "none", "unknown")
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"audit", dir, "--offline", "--fail-on", "info"})
+	if err := root.Execute(); err == nil {
+		t.Fatal("expected a failure: offline scans always report unchecked evidence at info")
+	}
+
+	root = cli.NewRoot("test", "none", "unknown")
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"audit", dir, "--offline", "--fail-on", "urgent"})
+	if err := root.Execute(); err == nil {
+		t.Fatal("expected an error for an unknown severity")
+	}
+}
+
+func TestDoctor(t *testing.T) {
+	isolateHome(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".npmrc"), []byte("registry=http://example.com/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	js := runCLI(t, "doctor", dir, "--no-fail", "--format", "json")
+	if err := schemas.Validate("doctor-report.schema.json", js); err != nil {
+		t.Fatalf("doctor json:\n%s\n%v", js, err)
+	}
+	if !bytes.Contains(js, []byte("registry-insecure-http")) {
+		t.Fatalf("missing finding:\n%s", js)
+	}
+
+	root := cli.NewRoot("test", "none", "unknown")
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"doctor", dir})
+	if err := root.Execute(); err == nil {
+		t.Fatal("expected a failure for a high severity finding")
+	}
+}
+
+func TestAuditMinReleaseAgeFlag(t *testing.T) {
+	isolateHome(t)
+	dir := filepath.Join("..", "ecosystem", "npm", "testdata")
+	runCLI(t, "audit", dir, "--offline", "--no-fail", "--min-release-age", "7d")
+	runCLI(t, "audit", dir, "--offline", "--no-fail", "--min-release-age", "72h")
+	for _, bad := range []string{"soon", "-3d", "xd", "-1h"} {
+		root := cli.NewRoot("test", "none", "unknown")
+		root.SetOut(&bytes.Buffer{})
+		root.SetErr(&bytes.Buffer{})
+		root.SetArgs([]string{"audit", dir, "--offline", "--no-fail", "--min-release-age", bad})
+		if err := root.Execute(); err == nil {
+			t.Fatalf("%q should be rejected", bad)
+		}
+	}
+}
+
+func TestExamplesExportAndVerifyAnSBOM(t *testing.T) {
+	isolateHome(t)
+	for _, name := range []string{"npm", "pnpm", "yarn", "bun", "uv", "poetry", "go", "cargo"} {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join("..", "..", "examples", name)
+			for _, spec := range []string{"cyclonedx", "spdx"} {
+				bom := runCLI(t, "sbom", "export", dir, "--spec", spec)
+				file := filepath.Join(t.TempDir(), spec+".json")
+				if err := os.WriteFile(file, bom, 0o644); err != nil {
+					t.Fatal(err)
+				}
+				out := runCLI(t, "sbom", "verify", file, dir, "--format", "json")
+				if !bytes.Contains(out, []byte(`"findings": []`)) {
+					t.Fatalf("%s %s: %s", name, spec, out)
+				}
+			}
+		})
+	}
+}
+
+func TestAuditMinReleaseAgeFromPolicy(t *testing.T) {
+	isolateHome(t)
+	dir := filepath.Join("..", "ecosystem", "npm", "testdata")
+	policyFile := func(age string) string {
+		path := filepath.Join(t.TempDir(), "policy.yaml")
+		if err := os.WriteFile(path, []byte("version: 1\nrules:\n  health:\n    min_release_age: "+age+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	// Offline there is no release date, so an active cooldown shows up as this finding.
+	const marker = "release-date-unknown"
+	off := string(runCLI(t, "audit", dir, "--offline", "--no-fail"))
+	if strings.Contains(off, marker) {
+		t.Fatalf("no cooldown is set, but audit checked release age:\n%s", off)
+	}
+	if on := string(runCLI(t, "audit", dir, "--offline", "--no-fail", "--policy", policyFile("7d"))); !strings.Contains(on, marker) {
+		t.Fatalf("policy cooldown was not applied:\n%s", on)
+	}
+	// The flag wins over the policy, so --min-release-age 0d turns the cooldown off.
+	if flagged := string(runCLI(t, "audit", dir, "--offline", "--no-fail", "--policy", policyFile("7d"), "--min-release-age", "0d")); strings.Contains(flagged, marker) {
+		t.Fatalf("flag did not override the policy:\n%s", flagged)
+	}
+	root := cli.NewRoot("test", "none", "unknown")
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"audit", dir, "--offline", "--no-fail", "--policy", policyFile("soon")})
+	if err := root.Execute(); err == nil {
+		t.Fatal("an invalid min_release_age should be rejected")
+	}
+}

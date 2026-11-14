@@ -1,0 +1,323 @@
+#!/usr/bin/env bash
+# Tests for action/run.sh. Invoked as: bash action/run_test.sh
+set -euo pipefail
+
+root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+bin="$tmp/bin"
+mkdir -p "$bin"
+PATH="$bin:$PATH"
+
+cat >"$bin/lafke" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "args:$*" >>"${CALL_LOG:?}"
+case "${1:-}" in
+  scan)
+    if [ "${FAIL_SCAN:-0}" = 1 ]; then
+      echo "scan failed" >&2
+      exit 1
+    fi
+    echo "scan ok"
+    ;;
+  diff)
+    if [ "${FAIL_DIFF:-0}" = 1 ]; then
+      echo "diff failed" >&2
+      exit 1
+    fi
+    echo "diff ok"
+    ;;
+  verify)
+    if [ "${FAIL_VERIFY:-0}" = 1 ]; then
+      echo "verify failed" >&2
+      exit 1
+    fi
+    echo "verify ok"
+    ;;
+  audit)
+    # A SARIF run writes its report to --output, like the real CLI.
+    prev=""
+    for arg in "$@"; do
+      if [ "$prev" = "--output" ]; then
+        echo '{"version":"2.1.0"}' >"$arg"
+      fi
+      prev="$arg"
+    done
+    if [ "${FAIL_AUDIT:-0}" = 1 ]; then
+      echo "audit failed" >&2
+      exit 1
+    fi
+    echo "audit ok"
+    ;;
+  sast)
+    prev=""
+    for arg in "$@"; do
+      if [ "$prev" = "--output" ]; then
+        echo '{"version":"2.1.0"}' >"$arg"
+      fi
+      prev="$arg"
+    done
+    if [ "${FAIL_SAST:-0}" = 1 ]; then
+      echo "sast failed" >&2
+      exit 1
+    fi
+    echo "sast ok"
+    ;;
+  security)
+    prev=""
+    for arg in "$@"; do
+      if [ "$prev" = "--output" ]; then
+        echo '{"version":"2.1.0"}' >"$arg"
+      fi
+      prev="$arg"
+    done
+    if [ "${FAIL_SECURITY:-0}" = 1 ]; then
+      echo "security failed" >&2
+      exit 1
+    fi
+    echo "security ok"
+    ;;
+  sbom)
+    if [ "${FAIL_SBOM:-0}" = 1 ]; then
+      echo "sbom failed" >&2
+      exit 1
+    fi
+    echo '{"bomFormat":"CycloneDX"}'
+    ;;
+  *)
+    echo "unexpected: $*" >&2
+    exit 2
+    ;;
+esac
+EOF
+chmod +x "$bin/lafke"
+
+run_case() {
+  local name="$1"
+  shift
+  local out="$tmp/$name"
+  mkdir -p "$out"
+  : >"$out/calls"
+  : >"$out/github_output"
+  CALL_LOG="$out/calls" LAFKE_REPORT="$out/report" GITHUB_OUTPUT="$out/github_output" \
+    "$@" >"$out/stdout" 2>"$out/stderr" || true
+}
+
+assert_contains() {
+  local file="$1"
+  local needle="$2"
+  if ! grep -Fq -- "$needle" "$file"; then
+    echo "missing in $file: $needle" >&2
+    cat "$file" >&2
+    exit 1
+  fi
+}
+
+assert_not_contains() {
+  local file="$1"
+  local needle="$2"
+  if grep -Fq -- "$needle" "$file"; then
+    echo "unexpected in $file: $needle" >&2
+    cat "$file" >&2
+    exit 1
+  fi
+}
+
+# Default command runs scan, then diff, then verify.
+run_case default env -u COMMAND FAIL_SCAN=0 FAIL_DIFF=0 FAIL_VERIFY=0 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/default/calls" "args:scan"
+assert_contains "$tmp/default/calls" "args:diff"
+assert_contains "$tmp/default/calls" "args:verify"
+assert_contains "$tmp/default/github_output" "failed=false"
+
+# both skips scan.
+run_case both env COMMAND=both FAIL_SCAN=1 \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/both/calls" "args:scan"
+assert_contains "$tmp/both/calls" "args:diff"
+assert_contains "$tmp/both/calls" "args:verify"
+assert_contains "$tmp/both/github_output" "failed=false"
+
+# scan failure marks the step failed without aborting later commands in all.
+run_case all_fail env COMMAND=all FAIL_SCAN=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/all_fail/calls" "args:scan"
+assert_contains "$tmp/all_fail/calls" "args:diff"
+assert_contains "$tmp/all_fail/calls" "args:verify"
+assert_contains "$tmp/all_fail/github_output" "failed=true"
+
+# profile flag is forwarded.
+run_case profile env COMMAND=scan PROFILE=strict \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/profile/calls" "args:scan --profile strict"
+assert_contains "$tmp/profile/github_output" "failed=false"
+
+# policy flag is forwarded.
+run_case policy env COMMAND=scan POLICY=policy.yaml \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/policy/calls" "args:scan --policy policy.yaml"
+assert_contains "$tmp/policy/github_output" "failed=false"
+
+# policy and profile are mutually exclusive.
+run_case exclusive env COMMAND=scan POLICY=policy.yaml PROFILE=strict \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/exclusive/stderr" "mutually exclusive"
+assert_contains "$tmp/exclusive/github_output" "failed=true"
+
+# reachability is forwarded to every command.
+run_case reach env COMMAND=scan REACHABILITY=true \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/reach/calls" "args:scan --reachability"
+run_case reach_off env COMMAND=scan REACHABILITY=false \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/reach_off/calls" "args:scan"
+assert_not_contains "$tmp/reach_off/calls" "--reachability"
+
+# audit is its own command, and only audit gets --min-release-age.
+run_case audit env COMMAND=audit MIN_RELEASE_AGE=7d REACHABILITY=true \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/audit/calls" "args:audit --min-release-age 7d --reachability"
+assert_contains "$tmp/audit/github_output" "failed=false"
+run_case audit_plain env COMMAND=audit \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/audit_plain/calls" "args:audit"
+assert_not_contains "$tmp/audit_plain/calls" "--min-release-age"
+run_case audit_fail env COMMAND=audit FAIL_AUDIT=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/audit_fail/github_output" "failed=true"
+# prioritize is audit-only too, and off unless asked for.
+run_case prioritize env COMMAND=audit PRIORITIZE=true \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/prioritize/calls" "args:audit --prioritize"
+run_case prioritize_off env COMMAND=audit PRIORITIZE=false \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/prioritize_off/calls" "--prioritize"
+run_case prioritize_not_forwarded env COMMAND=scan PRIORITIZE=true \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/prioritize_not_forwarded/calls" "--prioritize"
+# min-scorecard is audit-only as well.
+run_case scorecard env COMMAND=audit MIN_SCORECARD=5 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/scorecard/calls" "args:audit --min-scorecard 5"
+assert_not_contains "$tmp/audit_plain/calls" "--min-scorecard"
+run_case scorecard_not_forwarded env COMMAND=scan MIN_SCORECARD=5 \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/scorecard_not_forwarded/calls" "--min-scorecard"
+run_case scorecard_checks env COMMAND=audit SCORECARD=true \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/scorecard_checks/calls" "args:audit --scorecard"
+run_case scorecard_checks_off env COMMAND=audit SCORECARD=false \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/scorecard_checks_off/calls" "--scorecard"
+run_case age_not_forwarded env COMMAND=scan MIN_RELEASE_AGE=7d \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/age_not_forwarded/calls" "--min-release-age"
+
+# sarif: an audit report is written for code scanning without failing the job on its own.
+run_case sarif env COMMAND=scan SARIF_FILE="$tmp/sarif/out.sarif" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sarif/calls" "args:audit . --format sarif --output $tmp/sarif/out.sarif --no-fail"
+assert_contains "$tmp/sarif/github_output" "sarif-file=$tmp/sarif/out.sarif"
+assert_contains "$tmp/sarif/github_output" "failed=false"
+test -s "$tmp/sarif/out.sarif"
+# The SARIF run sees the same flags and is made from the directory the job started in.
+mkdir -p "$tmp/sarif_dir/project"
+run_case sarif_dir env COMMAND=scan WORKDIR=project REACHABILITY=true MIN_RELEASE_AGE=3d \
+  SARIF_FILE="$tmp/sarif_dir/out.sarif" bash -c 'cd "$1" && shift && bash "$@"' _ "$tmp/sarif_dir" "$root/action/run.sh"
+assert_contains "$tmp/sarif_dir/calls" "args:audit project --format sarif --output $tmp/sarif_dir/out.sarif --no-fail --reachability --min-release-age 3d"
+# import-sarif goes to sast only, one --import per line, relative paths anchored at the job's start.
+run_case sast_import env COMMAND=sast IMPORT_SARIF=$'reports/a.sarif\n  /abs/b.sarif  \n\n' \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast_import/calls" "args:sast --import $PWD/reports/a.sarif --import /abs/b.sarif"
+run_case sast_import_sarif env COMMAND=sast IMPORT_SARIF=reports/a.sarif SARIF_FILE="$tmp/sast_import_sarif/out.sarif" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast_import_sarif/calls" "--format sarif --output $tmp/sast_import_sarif/out.sarif --no-fail --import $PWD/reports/a.sarif"
+run_case sast_import_empty env COMMAND=sast IMPORT_SARIF= \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/sast_import_empty/calls" "--import"
+run_case import_not_forwarded env COMMAND=audit IMPORT_SARIF=reports/a.sarif \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/import_not_forwarded/calls" "--import"
+
+# A sast run uploads its own report, without the audit-only flags.
+run_case sast env COMMAND=sast MIN_RELEASE_AGE=7d \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast/calls" "args:sast"
+assert_not_contains "$tmp/sast/calls" "--min-release-age"
+assert_contains "$tmp/sast/github_output" "failed=false"
+run_case sast_fail env COMMAND=sast FAIL_SAST=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast_fail/github_output" "failed=true"
+run_case sast_sarif env COMMAND=sast MIN_RELEASE_AGE=7d SARIF_FILE="$tmp/sast_sarif/out.sarif" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sast_sarif/calls" "args:sast . --format sarif --output $tmp/sast_sarif/out.sarif --no-fail"
+assert_not_contains "$tmp/sast_sarif/calls" "args:audit"
+assert_contains "$tmp/sast_sarif/github_output" "sarif-file=$tmp/sast_sarif/out.sarif"
+# security is its own command: the unified report, with import and the shared flags, and
+# none of the audit-only flags. all keeps running scan, diff and verify only.
+run_case security env COMMAND=security OFFLINE=true MIN_RELEASE_AGE=7d IMPORT_SARIF=reports/a.sarif \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/security/calls" "args:security --import $PWD/reports/a.sarif --offline"
+assert_not_contains "$tmp/security/calls" "--min-release-age"
+assert_contains "$tmp/security/github_output" "failed=false"
+run_case security_fail env COMMAND=security FAIL_SECURITY=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/security_fail/github_output" "failed=true"
+run_case security_sarif env COMMAND=security SARIF_FILE="$tmp/security_sarif/out.sarif" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/security_sarif/calls" "args:security . --format sarif --output $tmp/security_sarif/out.sarif --no-fail"
+assert_not_contains "$tmp/security_sarif/calls" "args:audit"
+assert_contains "$tmp/security_sarif/github_output" "sarif-file=$tmp/security_sarif/out.sarif"
+run_case all_without_security env COMMAND=all \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/all_without_security/calls" "args:security"
+run_case sarif_off env COMMAND=scan \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/sarif_off/calls" "--format sarif"
+assert_not_contains "$tmp/sarif_off/github_output" "sarif-file"
+run_case sarif_fail env COMMAND=scan SARIF_FILE="$tmp/sarif_fail/out.sarif" FAIL_AUDIT=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sarif_fail/github_output" "failed=true"
+assert_not_contains "$tmp/sarif_fail/github_output" "sarif-file"
+
+# sbom: the lockfile is exported and its path returned.
+run_case sbom env COMMAND=scan SBOM_FILE="$tmp/sbom/bom.json" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sbom/calls" "args:sbom export"
+assert_contains "$tmp/sbom/github_output" "sbom-file=$tmp/sbom/bom.json"
+assert_contains "$tmp/sbom/bom.json" "CycloneDX"
+assert_contains "$tmp/sbom/github_output" "failed=false"
+run_case sbom_fail env COMMAND=scan SBOM_FILE="$tmp/sbom_fail/bom.json" FAIL_SBOM=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/sbom_fail/github_output" "failed=true"
+assert_not_contains "$tmp/sbom_fail/github_output" "sbom-file"
+
+# report-format markdown asks every command for a markdown report, and leaves the SARIF
+# and SBOM runs on their own formats.
+run_case md env COMMAND=scan REPORT_FORMAT=markdown SARIF_FILE="$tmp/md/out.sarif" SBOM_FILE="$tmp/md/bom.json" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/md/calls" "args:scan --format markdown"
+assert_contains "$tmp/md/calls" "args:audit . --format sarif --output $tmp/md/out.sarif --no-fail"
+assert_not_contains "$tmp/md/calls" "--no-fail --format markdown"
+assert_contains "$tmp/md/calls" "args:sbom export"
+assert_not_contains "$tmp/md/calls" "sbom export --format"
+assert_not_contains "$tmp/md/report" "lafke scan"
+assert_contains "$tmp/md/github_output" "failed=false"
+run_case md_summary env COMMAND=scan REPORT_FORMAT=markdown GITHUB_STEP_SUMMARY="$tmp/md_summary/summary" \
+  bash "$root/action/run.sh"
+assert_not_contains "$tmp/md_summary/summary" '```'
+run_case text_summary env COMMAND=scan GITHUB_STEP_SUMMARY="$tmp/text_summary/summary" \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/text_summary/summary" '```'
+run_case md_fail env COMMAND=scan REPORT_FORMAT=markdown FAIL_SCAN=1 \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/md_fail/github_output" "failed=true"
+run_case bad_format env COMMAND=scan REPORT_FORMAT=html \
+  bash "$root/action/run.sh"
+assert_contains "$tmp/bad_format/stderr" "unknown report-format"
+assert_contains "$tmp/bad_format/github_output" "failed=true"
+
+echo "ok"

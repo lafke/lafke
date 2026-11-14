@@ -1,0 +1,443 @@
+package policy
+
+import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const SchemaVersion = 1
+
+type Mode string
+
+const (
+	ModePublicOnly Mode = "public-only"
+	ModeOffline    Mode = "offline"
+	ModeAllowAll   Mode = "allow-all"
+)
+
+type ChangeAction string
+
+const (
+	ActionAllow  ChangeAction = "allow"
+	ActionWarn   ChangeAction = "warn"
+	ActionReview ChangeAction = "review"
+	ActionDeny   ChangeAction = "deny"
+)
+
+type Document struct {
+	Version int     `json:"version" yaml:"version"`
+	Network Network `json:"network,omitempty" yaml:"network,omitempty"`
+	Rules   Rules   `json:"rules" yaml:"rules"`
+}
+
+type Network struct {
+	Mode       Mode                `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Registries map[string][]string `json:"registries,omitempty" yaml:"registries,omitempty"`
+}
+
+type Rules struct {
+	RequireNoVulnerabilities bool              `json:"require_no_vulnerabilities" yaml:"require_no_vulnerabilities"`
+	RequireNoMalicious       bool              `json:"require_no_malicious" yaml:"require_no_malicious"`
+	RequireDigest            bool              `json:"require_digest" yaml:"require_digest"`
+	RequireProvenance        bool              `json:"require_provenance" yaml:"require_provenance"`
+	RequireSignature         bool              `json:"require_signature" yaml:"require_signature"`
+	Provenance               EvidenceRule      `json:"provenance,omitempty" yaml:"provenance,omitempty"`
+	Signature                EvidenceRule      `json:"signature,omitempty" yaml:"signature,omitempty"`
+	Vulnerabilities          VulnerabilityRule `json:"vulnerabilities,omitempty" yaml:"vulnerabilities,omitempty"`
+	Malicious                MaliciousRule     `json:"malicious,omitempty" yaml:"malicious,omitempty"`
+	Capabilities             CapabilityRule    `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
+	Ownership                OwnershipRule     `json:"ownership,omitempty" yaml:"ownership,omitempty"`
+	Health                   HealthRule        `json:"health,omitempty" yaml:"health,omitempty"`
+	Licenses                 LicenseRule       `json:"licenses,omitempty" yaml:"licenses,omitempty"`
+}
+
+// LicenseRule restricts packages by their declared license. Entries are SPDX identifiers;
+// a trailing * matches a prefix, so "GPL-*" covers every GPL version. A package that offers
+// a choice (MIT OR GPL-3.0-only) passes if any alternative passes.
+type LicenseRule struct {
+	// Allow, when set, lets through only packages whose license is on the list.
+	Allow []string `json:"allow,omitempty" yaml:"allow,omitempty"`
+	// Deny rejects packages whose license is on the list, whatever Allow says.
+	Deny []string `json:"deny,omitempty" yaml:"deny,omitempty"`
+	// Unchecked says what to do with a package whose license was not looked up, which is
+	// every package outside npm and PyPI, and any package scanned offline. "unknown", the
+	// default, makes it unknown; "allow" lets it through so the rule only judges what it can see.
+	Unchecked string `json:"unchecked,omitempty" yaml:"unchecked,omitempty"`
+}
+
+func (r LicenseRule) Configured() bool { return len(r.Allow) > 0 || len(r.Deny) > 0 }
+
+// AllowUnchecked reports whether packages with no license evidence pass the rule.
+func (r LicenseRule) AllowUnchecked() bool { return r.Unchecked == "allow" }
+
+type EvidenceRule struct {
+	Minimum             string   `json:"minimum,omitempty" yaml:"minimum,omitempty"`
+	AllowSources        []string `json:"allow_sources,omitempty" yaml:"allow_sources,omitempty"`
+	AllowBuilders       []string `json:"allow_builders,omitempty" yaml:"allow_builders,omitempty"`
+	AllowWorkflows      []string `json:"allow_workflows,omitempty" yaml:"allow_workflows,omitempty"`
+	AllowRefs           []string `json:"allow_refs,omitempty" yaml:"allow_refs,omitempty"`
+	AllowPredicateTypes []string `json:"allow_predicate_types,omitempty" yaml:"allow_predicate_types,omitempty"`
+}
+
+// OriginConfigured reports whether provenance origin allowlists are set.
+func (r EvidenceRule) OriginConfigured() bool {
+	return len(r.AllowSources) > 0 ||
+		len(r.AllowBuilders) > 0 ||
+		len(r.AllowWorkflows) > 0 ||
+		len(r.AllowRefs) > 0 ||
+		len(r.AllowPredicateTypes) > 0
+}
+
+// VulnerabilityRule is an optional structured form of vulnerability policy.
+// allow: "none" is equivalent to require_no_vulnerabilities: true.
+type VulnerabilityRule struct {
+	Allow string `json:"allow,omitempty" yaml:"allow,omitempty"`
+}
+
+// MaliciousRule is an optional structured form of malware policy.
+// allow: "none" is equivalent to require_no_malicious: true.
+type MaliciousRule struct {
+	Allow string `json:"allow,omitempty" yaml:"allow,omitempty"`
+}
+
+type CapabilityRule struct {
+	Deny       []string       `json:"deny,omitempty" yaml:"deny,omitempty"`
+	Filesystem FilesystemRule `json:"filesystem,omitempty" yaml:"filesystem,omitempty"`
+}
+
+type FilesystemRule struct {
+	Maximum string `json:"maximum,omitempty" yaml:"maximum,omitempty"`
+}
+
+type OwnershipRule struct {
+	PublisherChange   ChangeAction `json:"publisher_change,omitempty" yaml:"publisher_change,omitempty"`
+	MaintainerAdded   ChangeAction `json:"maintainer_added,omitempty" yaml:"maintainer_added,omitempty"`
+	MaintainerRemoved ChangeAction `json:"maintainer_removed,omitempty" yaml:"maintainer_removed,omitempty"`
+}
+
+// HealthRule restricts packages by what the registry reports about the release.
+// Each field is "allow" (or empty) or "deny".
+type HealthRule struct {
+	// Deprecated denies releases the maintainers marked deprecated, or that PyPI yanked.
+	Deprecated string `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	// Typosquat denies package names that look like a misspelling of a popular package.
+	Typosquat string `json:"typosquat,omitempty" yaml:"typosquat,omitempty"`
+	// TyposquatAllow lists package names that are checked and known to be fine, so a real
+	// package whose name happens to be close to a popular one is not denied. Names are
+	// written as the registry spells them, without the ecosystem.
+	TyposquatAllow []string `json:"typosquat_allow,omitempty" yaml:"typosquat_allow,omitempty"`
+	// MinReleaseAge is the release cooldown `lafke audit` applies when --min-release-age
+	// is not given: a number of days such as "7d", or a duration such as "72h". It is read
+	// by audit only. Trust status must not change because time passed, so it is not part of
+	// the fingerprint and Configured ignores it.
+	MinReleaseAge string `json:"min_release_age,omitempty" yaml:"min_release_age,omitempty"`
+	// InternalNames lists the packages your organization publishes privately, as
+	// "<ecosystem>:<name>", where a trailing * matches a prefix (npm:@acme/*). `lafke
+	// audit` reports one that resolves from a public registry as a dependency-confusion
+	// risk. Like MinReleaseAge it is read by audit only, so it is not part of the
+	// fingerprint and Configured ignores it.
+	InternalNames []string `json:"internal_names,omitempty" yaml:"internal_names,omitempty"`
+	// ScorecardChecks sets a minimum score (0 to 10) for individual OpenSSF Scorecard checks,
+	// by name, such as Dangerous-Workflow: 5. `lafke audit --scorecard` reports a package
+	// whose source repository scores below it. Like MinReleaseAge it is read by audit only, so
+	// it is not part of the fingerprint and Configured ignores it.
+	ScorecardChecks map[string]float64 `json:"scorecard_checks,omitempty" yaml:"scorecard_checks,omitempty"`
+}
+
+// ParseAge reads a minimum release age: empty (off), a day count such as 7d, or a Go
+// duration such as 72h.
+func ParseAge(s string) (time.Duration, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, nil
+	}
+	if days, ok := strings.CutSuffix(s, "d"); ok {
+		n, err := strconv.Atoi(days)
+		if err != nil || n < 0 {
+			return 0, fmt.Errorf("%q: use a number of days such as 7d, or a duration such as 72h", s)
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d < 0 {
+		return 0, fmt.Errorf("%q: use a number of days such as 7d, or a duration such as 72h", s)
+	}
+	return d, nil
+}
+
+func (r HealthRule) DenyDeprecated() bool { return r.Deprecated == "deny" }
+
+func (r HealthRule) DenyTyposquat() bool { return r.Typosquat == "deny" }
+
+func (r HealthRule) Configured() bool {
+	return r.Deprecated != "" || r.Typosquat != "" || len(r.TyposquatAllow) > 0
+}
+
+func Default() Document {
+	return Document{
+		Version: SchemaVersion,
+		Network: Network{Mode: ModePublicOnly},
+		Rules: Rules{
+			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
+		},
+	}
+}
+
+// Strict is a built-in profile that requires lockfile digests and
+// cryptographically verified provenance and signatures.
+func Strict() Document {
+	return Document{
+		Version: SchemaVersion,
+		Network: Network{Mode: ModePublicOnly},
+		Rules: Rules{
+			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
+			RequireDigest:            true,
+			Provenance:               EvidenceRule{Minimum: "verified"},
+			Signature:                EvidenceRule{Minimum: "verified"},
+		},
+	}
+}
+
+// Profile returns a built-in policy by name.
+func Profile(name string) (Document, error) {
+	switch name {
+	case "", "default":
+		return Default(), nil
+	case "strict":
+		return Strict(), nil
+	default:
+		return Document{}, fmt.Errorf("unknown policy profile %q", name)
+	}
+}
+
+func (n Network) ResolvedMode() Mode {
+	if n.Mode == "" {
+		return ModePublicOnly
+	}
+	return n.Mode
+}
+
+func (r Rules) DenyVulnerabilities() bool {
+	if r.RequireNoVulnerabilities {
+		return true
+	}
+	return r.Vulnerabilities.Allow == "none"
+}
+
+func (r Rules) DenyMalicious() bool {
+	if r.RequireNoMalicious {
+		return true
+	}
+	return r.Malicious.Allow == "none"
+}
+
+func (a ChangeAction) Fails() bool {
+	return a == ActionDeny || a == ActionReview
+}
+
+func (a ChangeAction) Reports() bool {
+	return a == ActionWarn || a.Fails()
+}
+
+func (r OwnershipRule) Configured() bool {
+	return r.PublisherChange != "" || r.MaintainerAdded != "" || r.MaintainerRemoved != ""
+}
+
+func (r CapabilityRule) Configured() bool {
+	return len(r.Deny) > 0 || r.Filesystem.Maximum != ""
+}
+
+func Fingerprint(doc Document) (string, error) {
+	raw, err := json.Marshal(canonical(doc))
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(raw)
+	return fmt.Sprintf("sha256:%x", sum), nil
+}
+
+type canonicalDocument struct {
+	Version int              `json:"version"`
+	Network canonicalNetwork `json:"network"`
+	Rules   canonicalRules   `json:"rules"`
+}
+
+type canonicalNetwork struct {
+	Mode       Mode                `json:"mode"`
+	Registries map[string][]string `json:"registries,omitempty"`
+}
+
+type canonicalRules struct {
+	RequireNoVulnerabilities bool                `json:"require_no_vulnerabilities,omitempty"`
+	RequireNoMalicious       bool                `json:"require_no_malicious,omitempty"`
+	RequireDigest            bool                `json:"require_digest,omitempty"`
+	RequireProvenance        bool                `json:"require_provenance,omitempty"`
+	RequireSignature         bool                `json:"require_signature,omitempty"`
+	Provenance               *canonicalEvidence  `json:"provenance,omitempty"`
+	Signature                *canonicalEvidence  `json:"signature,omitempty"`
+	Vulnerabilities          *canonicalVulnRule  `json:"vulnerabilities,omitempty"`
+	Malicious                *canonicalVulnRule  `json:"malicious,omitempty"`
+	Capabilities             *canonicalCapRule   `json:"capabilities,omitempty"`
+	Ownership                *canonicalOwnerRule `json:"ownership,omitempty"`
+	Health                   *canonicalHealth    `json:"health,omitempty"`
+	Licenses                 *canonicalLicenses  `json:"licenses,omitempty"`
+}
+
+type canonicalLicenses struct {
+	Allow     []string `json:"allow,omitempty"`
+	Deny      []string `json:"deny,omitempty"`
+	Unchecked string   `json:"unchecked,omitempty"`
+}
+
+type canonicalHealth struct {
+	Deprecated     string   `json:"deprecated,omitempty"`
+	Typosquat      string   `json:"typosquat,omitempty"`
+	TyposquatAllow []string `json:"typosquat_allow,omitempty"`
+}
+
+type canonicalEvidence struct {
+	Minimum             string   `json:"minimum,omitempty"`
+	AllowSources        []string `json:"allow_sources,omitempty"`
+	AllowBuilders       []string `json:"allow_builders,omitempty"`
+	AllowWorkflows      []string `json:"allow_workflows,omitempty"`
+	AllowRefs           []string `json:"allow_refs,omitempty"`
+	AllowPredicateTypes []string `json:"allow_predicate_types,omitempty"`
+}
+
+type canonicalVulnRule struct {
+	Allow string `json:"allow,omitempty"`
+}
+
+type canonicalCapRule struct {
+	Deny       []string `json:"deny,omitempty"`
+	Filesystem string   `json:"filesystem_maximum,omitempty"`
+}
+
+type canonicalOwnerRule struct {
+	PublisherChange   ChangeAction `json:"publisher_change,omitempty"`
+	MaintainerAdded   ChangeAction `json:"maintainer_added,omitempty"`
+	MaintainerRemoved ChangeAction `json:"maintainer_removed,omitempty"`
+}
+
+func canonical(doc Document) canonicalDocument {
+	if doc.Version == 0 {
+		doc.Version = SchemaVersion
+	}
+	return canonicalDocument{
+		Version: doc.Version,
+		Network: canonicalNetwork{
+			Mode:       doc.Network.ResolvedMode(),
+			Registries: canonicalRegistries(doc.Network.Registries),
+		},
+		Rules: canonicalRules{
+			RequireNoVulnerabilities: doc.Rules.RequireNoVulnerabilities,
+			RequireNoMalicious:       doc.Rules.RequireNoMalicious,
+			RequireDigest:            doc.Rules.RequireDigest,
+			RequireProvenance:        doc.Rules.RequireProvenance,
+			RequireSignature:         doc.Rules.RequireSignature,
+			Provenance:               canonicalEvidenceRule(doc.Rules.Provenance),
+			Signature:                canonicalEvidenceRule(doc.Rules.Signature),
+			Vulnerabilities:          canonicalVuln(doc.Rules.Vulnerabilities),
+			Malicious:                canonicalMalicious(doc.Rules.Malicious),
+			Capabilities:             canonicalCapabilities(doc.Rules.Capabilities),
+			Ownership:                canonicalOwnership(doc.Rules.Ownership),
+			Health:                   canonicalHealthRule(doc.Rules.Health),
+			Licenses:                 canonicalLicenseRule(doc.Rules.Licenses),
+		},
+	}
+}
+
+func canonicalEvidenceRule(rule EvidenceRule) *canonicalEvidence {
+	if rule.Minimum == "" && !rule.OriginConfigured() {
+		return nil
+	}
+	return &canonicalEvidence{
+		Minimum:             rule.Minimum,
+		AllowSources:        sortedCompact(rule.AllowSources),
+		AllowBuilders:       sortedCompact(rule.AllowBuilders),
+		AllowWorkflows:      sortedCompact(rule.AllowWorkflows),
+		AllowRefs:           sortedCompact(rule.AllowRefs),
+		AllowPredicateTypes: sortedCompact(rule.AllowPredicateTypes),
+	}
+}
+
+func sortedCompact(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := slices.Clone(in)
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+func canonicalVuln(rule VulnerabilityRule) *canonicalVulnRule {
+	if rule.Allow == "" {
+		return nil
+	}
+	return &canonicalVulnRule{Allow: rule.Allow}
+}
+
+func canonicalMalicious(rule MaliciousRule) *canonicalVulnRule {
+	if rule.Allow == "" {
+		return nil
+	}
+	return &canonicalVulnRule{Allow: rule.Allow}
+}
+
+func canonicalCapabilities(rule CapabilityRule) *canonicalCapRule {
+	if !rule.Configured() {
+		return nil
+	}
+	deny := slices.Clone(rule.Deny)
+	slices.Sort(deny)
+	deny = slices.Compact(deny)
+	return &canonicalCapRule{
+		Deny:       deny,
+		Filesystem: rule.Filesystem.Maximum,
+	}
+}
+
+func canonicalOwnership(rule OwnershipRule) *canonicalOwnerRule {
+	if !rule.Configured() {
+		return nil
+	}
+	return &canonicalOwnerRule{
+		PublisherChange:   rule.PublisherChange,
+		MaintainerAdded:   rule.MaintainerAdded,
+		MaintainerRemoved: rule.MaintainerRemoved,
+	}
+}
+
+func canonicalLicenseRule(rule LicenseRule) *canonicalLicenses {
+	if !rule.Configured() {
+		return nil
+	}
+	return &canonicalLicenses{Allow: sortedCompact(rule.Allow), Deny: sortedCompact(rule.Deny), Unchecked: rule.Unchecked}
+}
+
+func canonicalHealthRule(rule HealthRule) *canonicalHealth {
+	if !rule.Configured() {
+		return nil
+	}
+	return &canonicalHealth{Deprecated: rule.Deprecated, Typosquat: rule.Typosquat, TyposquatAllow: sortedCompact(rule.TyposquatAllow)}
+}
+
+func canonicalRegistries(in map[string][]string) map[string][]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string][]string, len(in))
+	for eco, urls := range in {
+		copied := slices.Clone(urls)
+		slices.Sort(copied)
+		out[eco] = copied
+	}
+	return out
+}

@@ -1,0 +1,185 @@
+package schemas_test
+
+import (
+	"testing"
+
+	"github.com/lafke/cli/schemas"
+)
+
+func TestURLArtifactOmitsVersion(t *testing.T) {
+	raw := []byte(`{
+  "version": 3,
+  "artifacts": [
+    {
+      "subject": { "ecosystem": "url", "name": "https://esm.sh/preact" },
+      "source": {
+        "resolver": "deno",
+        "kind": "url",
+        "requested": "https://esm.sh/preact",
+        "resolved": "https://esm.sh/preact@10.26.8"
+      },
+      "evidence": {
+        "provenance": "unknown",
+        "signature": "unknown",
+        "vulnerabilities": { "state": "unknown" },
+        "malicious": { "state": "unknown" },
+        "capabilities": { "state": "unknown" },
+        "behavior": { "state": "unknown" },
+        "ownership": { "state": "unknown" },
+        "chain": { "state": "unknown" }
+      },
+      "trust": { "status": "unknown" }
+    }
+  ]
+}`)
+	if err := schemas.Validate("scan-report.schema.json", raw); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNPMArtifactRequiresVersion(t *testing.T) {
+	raw := []byte(`{
+  "version": 3,
+  "artifacts": [
+    {
+      "subject": { "ecosystem": "npm", "name": "react" },
+      "evidence": {
+        "provenance": "unknown",
+        "signature": "unknown",
+        "vulnerabilities": { "state": "unknown" },
+        "malicious": { "state": "unknown" },
+        "capabilities": { "state": "unknown" },
+        "behavior": { "state": "unknown" },
+        "ownership": { "state": "unknown" },
+        "chain": { "state": "unknown" }
+      },
+      "trust": { "status": "unknown" }
+    }
+  ]
+}`)
+	if err := schemas.Validate("scan-report.schema.json", raw); err == nil {
+		t.Fatal("npm artifacts must require version")
+	}
+}
+
+func TestDiffSideRequestedResolved(t *testing.T) {
+	raw := []byte(`{
+  "schema_version": 1,
+  "trust_drift": true,
+  "changes": [
+    {
+      "artifact": "url:https://esm.sh/preact",
+      "subject": "url:https://esm.sh/preact",
+      "before": {
+        "requested": ["https://esm.sh/preact"],
+        "resolved": ["https://esm.sh/preact@10.26.8"]
+      },
+      "after": {
+        "requested": ["https://esm.sh/preact"],
+        "resolved": ["https://esm.sh/preact@10.26.9"]
+      }
+    }
+  ]
+}`)
+	if err := schemas.Validate("diff-report.schema.json", raw); err != nil {
+		t.Fatal(err)
+	}
+	if err := schemas.Validate("verify-report.schema.json", raw); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDiffSideRegistries(t *testing.T) {
+	raw := []byte(`{
+  "schema_version": 1,
+  "trust_drift": true,
+  "changes": [
+    {
+      "artifact": "npm:react@19.2.0",
+      "subject": "npm:react",
+      "before": {
+        "kinds": ["registry"],
+        "registries": ["https://registry.example-a.com"]
+      },
+      "after": {
+        "kinds": ["registry"],
+        "registries": ["https://registry.example-b.com"]
+      }
+    }
+  ]
+}`)
+	if err := schemas.Validate("diff-report.schema.json", raw); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRejectsUnknownArtifactField(t *testing.T) {
+	raw := []byte(`{
+  "version": 3,
+  "artifacts": [
+    {
+      "subject": { "ecosystem": "npm", "name": "react" },
+      "version": "19.2.0",
+      "banana": true,
+      "evidence": {
+        "provenance": "unknown",
+        "signature": "unknown",
+        "vulnerabilities": { "state": "unknown" },
+        "malicious": { "state": "unknown" },
+        "capabilities": { "state": "unknown" },
+        "behavior": { "state": "unknown" },
+        "ownership": { "state": "unknown" },
+        "chain": { "state": "unknown" }
+      },
+      "trust": { "status": "unknown" }
+    }
+  ]
+}`)
+	if err := schemas.Validate("scan-report.schema.json", raw); err == nil {
+		t.Fatal("unknown fields must fail")
+	}
+}
+
+func TestHealthEvidenceIsOptionalAndBounded(t *testing.T) {
+	doc := func(health string) []byte {
+		return []byte(`{
+  "version": 3,
+  "artifacts": [
+    {
+      "subject": { "ecosystem": "npm", "name": "react" },
+      "version": "19.2.0",
+      "evidence": {
+        "provenance": "unknown",
+        "signature": "unknown",
+        "vulnerabilities": { "state": "unknown" },
+        "malicious": { "state": "unknown" },
+        "capabilities": { "state": "unknown" },
+        "behavior": { "state": "unknown" },
+        "ownership": { "state": "unknown" },
+        "chain": { "state": "unknown" }` + health + `
+      },
+      "trust": { "status": "unknown" }
+    }
+  ]
+}`)
+	}
+	tests := []struct {
+		name    string
+		health  string
+		wantErr bool
+	}{
+		{"absent", ``, false},
+		{"full", `, "health": { "released": "2025-01-31", "deprecated": "use x", "license": "MIT" }`, false},
+		{"empty", `, "health": {}`, false},
+		{"bad date", `, "health": { "released": "yesterday" }`, true},
+		{"unknown field", `, "health": { "score": 9 }`, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := schemas.Validate("lafke-lock.schema.json", doc(tt.health))
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

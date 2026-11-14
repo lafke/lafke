@@ -1,0 +1,299 @@
+package policy_test
+
+import (
+	"testing"
+
+	"github.com/lafke/cli/pkg/policy"
+)
+
+const defaultFingerprint = "sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1"
+
+func TestFingerprintDefaultGolden(t *testing.T) {
+	got, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != defaultFingerprint {
+		t.Fatalf("default fingerprint = %s, want %s", got, defaultFingerprint)
+	}
+}
+
+func TestStrictProfile(t *testing.T) {
+	doc, err := policy.Profile("strict")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := policy.Validate(doc); err != nil {
+		t.Fatal(err)
+	}
+	if !doc.Rules.RequireDigest {
+		t.Fatal("strict must require digest")
+	}
+	if doc.Rules.Provenance.Minimum != "verified" || doc.Rules.Signature.Minimum != "verified" {
+		t.Fatalf("strict evidence floors = %+v", doc.Rules)
+	}
+	fp, err := policy.Fingerprint(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	def, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fp == def {
+		t.Fatal("strict fingerprint must differ from default")
+	}
+}
+
+func TestProfileUnknown(t *testing.T) {
+	if _, err := policy.Profile("paranoid"); err == nil {
+		t.Fatal("expected unknown profile error")
+	}
+}
+
+func TestFingerprintStable(t *testing.T) {
+	a, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := policy.Fingerprint(policy.Document{
+		Version: 1,
+		Rules: policy.Rules{
+			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Fatalf("default fingerprint %s != implied public-only %s", a, b)
+	}
+	if a != defaultFingerprint {
+		t.Fatalf("fingerprint = %s", a)
+	}
+}
+
+func TestFingerprintIgnoresEmptyEvidenceRules(t *testing.T) {
+	a, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := policy.Fingerprint(policy.Document{
+		Version: 1,
+		Network: policy.Network{Mode: policy.ModePublicOnly},
+		Rules: policy.Rules{
+			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
+			Provenance:               policy.EvidenceRule{},
+			Signature:                policy.EvidenceRule{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Fatalf("empty evidence rules changed fingerprint: %s != %s", a, b)
+	}
+}
+
+func TestFingerprintEvidenceMinimum(t *testing.T) {
+	base, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := policy.Fingerprint(policy.Document{
+		Version: 1,
+		Network: policy.Network{Mode: policy.ModePublicOnly},
+		Rules: policy.Rules{
+			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
+			Provenance:               policy.EvidenceRule{Minimum: "present"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == base {
+		t.Fatal("provenance minimum must change fingerprint")
+	}
+}
+
+func TestFingerprintCapabilities(t *testing.T) {
+	base, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := policy.Fingerprint(policy.Document{
+		Version: 1,
+		Network: policy.Network{Mode: policy.ModePublicOnly},
+		Rules: policy.Rules{
+			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
+			Capabilities: policy.CapabilityRule{
+				Deny: []string{"shell", "native_code"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == base {
+		t.Fatal("capability deny must change fingerprint")
+	}
+}
+
+func TestValidateCapabilityAndOwnership(t *testing.T) {
+	doc := policy.Document{
+		Version: 1,
+		Rules: policy.Rules{
+			Capabilities: policy.CapabilityRule{
+				Deny:       []string{"shell"},
+				Filesystem: policy.FilesystemRule{Maximum: "read"},
+			},
+			Ownership: policy.OwnershipRule{
+				PublisherChange:   policy.ActionDeny,
+				MaintainerAdded:   policy.ActionWarn,
+				MaintainerRemoved: policy.ActionReview,
+			},
+		},
+	}
+	if err := policy.Validate(doc); err != nil {
+		t.Fatal(err)
+	}
+	doc.Rules.Capabilities.Deny = []string{"laser"}
+	if err := policy.Validate(doc); err == nil {
+		t.Fatal("unknown capability must fail")
+	}
+}
+
+func TestFingerprintProvenanceOrigin(t *testing.T) {
+	base, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := policy.Fingerprint(policy.Document{
+		Version: 1,
+		Network: policy.Network{Mode: policy.ModePublicOnly},
+		Rules: policy.Rules{
+			RequireNoVulnerabilities: true,
+			RequireNoMalicious:       true,
+			Provenance: policy.EvidenceRule{
+				AllowSources: []string{"github.com/acme/pkg"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == base {
+		t.Fatal("provenance allow_sources must change fingerprint")
+	}
+}
+
+func TestValidateSignatureRejectsOriginAllowlists(t *testing.T) {
+	doc := policy.Document{
+		Version: 1,
+		Rules: policy.Rules{
+			Signature: policy.EvidenceRule{
+				AllowSources: []string{"github.com/acme/pkg"},
+			},
+		},
+	}
+	if err := policy.Validate(doc); err == nil {
+		t.Fatal("signature origin allowlists must fail validation")
+	}
+}
+
+func TestValidateProvenanceOriginEmptyEntry(t *testing.T) {
+	doc := policy.Document{
+		Version: 1,
+		Rules: policy.Rules{
+			Provenance: policy.EvidenceRule{
+				AllowSources: []string{" "},
+			},
+		},
+	}
+	if err := policy.Validate(doc); err == nil {
+		t.Fatal("empty allow_sources entry must fail")
+	}
+}
+
+func TestInternalNamesValidation(t *testing.T) {
+	tests := []struct {
+		entries []string
+		wantErr bool
+	}{
+		{nil, false},
+		{[]string{"npm:@acme/*", "pypi:acme-core"}, false},
+		{[]string{"acme-core"}, true},
+		{[]string{":acme"}, true},
+		{[]string{"npm:"}, true},
+		{[]string{"npm:*"}, true},
+		{[]string{"npm:@a*me/x"}, true},
+		{[]string{" npm:@acme/*"}, true},
+	}
+	for _, tt := range tests {
+		doc := policy.Default()
+		doc.Rules.Health.InternalNames = tt.entries
+		if err := policy.Validate(doc); (err != nil) != tt.wantErr {
+			t.Errorf("%v: err = %v, wantErr %v", tt.entries, err, tt.wantErr)
+		}
+	}
+}
+
+func TestInternalNamesNotInFingerprint(t *testing.T) {
+	base, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := policy.Default()
+	doc.Rules.Health.InternalNames = []string{"npm:@acme/*"}
+	got, err := policy.Fingerprint(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != base {
+		t.Fatal("internal_names only affects audit and must not change the fingerprint")
+	}
+	if doc.Rules.Health.Configured() {
+		t.Fatal("internal_names must not make the health rule configured")
+	}
+}
+
+func TestScorecardChecksValidation(t *testing.T) {
+	tests := []struct {
+		checks  map[string]float64
+		wantErr bool
+	}{
+		{nil, false},
+		{map[string]float64{"Dangerous-Workflow": 5, "Maintained": 0, "Code-Review": 10}, false},
+		{map[string]float64{"Dangerous-Workflows": 5}, true},
+		{map[string]float64{"dangerous-workflow": 5}, true},
+		{map[string]float64{"Maintained": -1}, true},
+		{map[string]float64{"Maintained": 10.5}, true},
+	}
+	for _, tt := range tests {
+		doc := policy.Default()
+		doc.Rules.Health.ScorecardChecks = tt.checks
+		if err := policy.Validate(doc); (err != nil) != tt.wantErr {
+			t.Errorf("%v: err = %v, wantErr %v", tt.checks, err, tt.wantErr)
+		}
+	}
+}
+
+func TestScorecardChecksNotInFingerprint(t *testing.T) {
+	base, err := policy.Fingerprint(policy.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := policy.Default()
+	doc.Rules.Health.ScorecardChecks = map[string]float64{"Dangerous-Workflow": 5}
+	got, err := policy.Fingerprint(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != base || doc.Rules.Health.Configured() {
+		t.Fatal("scorecard_checks only affects audit: no fingerprint change, and not a configured health rule")
+	}
+}

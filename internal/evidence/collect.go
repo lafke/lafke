@@ -1,0 +1,27 @@
+package evidence
+
+import (
+	"context"
+
+	"github.com/lafke/cli/internal/ecosystem"
+	"github.com/lafke/cli/pkg/lockfile"
+)
+
+type Record struct {
+	Provenance   lockfile.EvidenceState
+	Signature    lockfile.EvidenceState
+	Capabilities lockfile.CapabilityEvidence
+	Behavior     lockfile.BehaviorEvidence
+	Ownership    lockfile.OwnershipEvidence
+	Chain        lockfile.ChainEvidence
+	// Health is nil when the registry did not answer.
+	Health *lockfile.HealthEvidence
+}
+
+type Collector interface {
+	Collect(ctx context.Context, deps []ecosystem.Dependency) (map[string]Record, error)
+}
+
+func Key(dep ecosystem.Dependency) string {
+	return ecosystem.Identity(dep)
+}

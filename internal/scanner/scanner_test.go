@@ -1,0 +1,508 @@
+package scanner_test
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/lafke/cli/internal/ecosystem"
+	"github.com/lafke/cli/internal/evidence"
+	"github.com/lafke/cli/internal/osv"
+	"github.com/lafke/cli/internal/scanner"
+	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/cli/pkg/policy"
+)
+
+type fakeOSV struct {
+	vulns map[string][]lockfile.Vulnerability
+}
+
+func (f fakeOSV) Query(_ context.Context, deps []ecosystem.Dependency) (map[string][]lockfile.Vulnerability, error) {
+	out := make(map[string][]lockfile.Vulnerability, len(deps))
+	for _, dep := range deps {
+		key := ecosystem.Identity(dep)
+		out[key] = f.vulns[key]
+	}
+	return out, nil
+}
+
+func TestScanOffline(t *testing.T) {
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:    "../ecosystem/npm/testdata",
+		Offline: true,
+		Policy:  policy.Default(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Document.Artifacts) != 3 {
+		t.Fatalf("got %d artifacts", len(result.Document.Artifacts))
+	}
+	trusted, untrusted, unknown := scanner.Summary(result.Document)
+	if trusted != 0 || untrusted != 0 || unknown != 3 {
+		t.Fatalf("summary = %d/%d/%d", trusted, untrusted, unknown)
+	}
+}
+
+type fakeEvidence map[string]evidence.Record
+
+func (f fakeEvidence) Collect(_ context.Context, deps []ecosystem.Dependency) (map[string]evidence.Record, error) {
+	out := make(map[string]evidence.Record, len(deps))
+	for _, dep := range deps {
+		key := evidence.Key(dep)
+		out[key] = f[key]
+	}
+	return out, nil
+}
+
+func TestScanWithVulnerabilities(t *testing.T) {
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:   "../ecosystem/npm/testdata",
+		Policy: policy.Default(),
+		Client: fakeOSV{vulns: map[string][]lockfile.Vulnerability{
+			"npm:react@19.2.0": {{ID: "GHSA-test"}},
+		}},
+		Evidence: fakeEvidence{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, untrusted, _ := scanner.Summary(result.Document)
+	if untrusted != 1 {
+		t.Fatalf("untrusted = %d, want 1", untrusted)
+	}
+}
+
+func TestScanPrivateNotQueried(t *testing.T) {
+	dir := t.TempDir()
+	raw := `{
+  "name": "fixture",
+  "lockfileVersion": 3,
+  "packages": {
+    "node_modules/@company/internal-auth": {
+      "version": "1.0.0",
+      "resolved": "https://npm.company.example/@company/internal-auth/-/internal-auth-1.0.0.tgz",
+      "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="
+    }
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &countingOSV{}
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:   dir,
+		Policy: policy.Default(),
+		Client: client,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.n != 0 {
+		t.Fatalf("queried %d private packages", client.n)
+	}
+	if result.Document.Artifacts[0].Evidence.Vulnerabilities.State != lockfile.VulnUnknown {
+		t.Fatalf("state = %s", result.Document.Artifacts[0].Evidence.Vulnerabilities.State)
+	}
+	if result.Document.Artifacts[0].Trust.Status != lockfile.StatusUnknown {
+		t.Fatalf("trust = %s", result.Document.Artifacts[0].Trust.Status)
+	}
+}
+
+func TestScanPnpmChecksVulns(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("npm_config_registry", "")
+	t.Setenv("NPM_CONFIG_REGISTRY", "")
+
+	client := &countingOSV{}
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     "../ecosystem/pnpm/testdata",
+		Policy:   policy.Default(),
+		Client:   client,
+		Evidence: fakeEvidence{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.n != 3 {
+		t.Fatalf("queried %d packages, want 3", client.n)
+	}
+	for _, art := range result.Document.Artifacts {
+		if art.Evidence.Vulnerabilities.State != lockfile.VulnChecked {
+			t.Fatalf("%s state = %s", art.Subject.Name, art.Evidence.Vulnerabilities.State)
+		}
+		if art.Trust.Status != lockfile.StatusTrusted {
+			t.Fatalf("%s trust = %s", art.Subject.Name, art.Trust.Status)
+		}
+	}
+}
+
+func TestScanPnpmUnprovenRegistry(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("npm_config_registry", "")
+	t.Setenv("NPM_CONFIG_REGISTRY", "")
+
+	dir := t.TempDir()
+	raw, err := os.ReadFile(filepath.Join("..", "ecosystem", "pnpm", "testdata", "pnpm-lock.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "pnpm-lock.yaml"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &countingOSV{}
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     dir,
+		Policy:   policy.Default(),
+		Client:   client,
+		Evidence: fakeEvidence{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.n != 0 {
+		t.Fatalf("queried %d packages, want 0", client.n)
+	}
+	for _, art := range result.Document.Artifacts {
+		if art.Evidence.Vulnerabilities.State != lockfile.VulnUnknown {
+			t.Fatalf("%s state = %s", art.Subject.Name, art.Evidence.Vulnerabilities.State)
+		}
+		if art.Trust.Status != lockfile.StatusUnknown {
+			t.Fatalf("%s trust = %s", art.Subject.Name, art.Trust.Status)
+		}
+	}
+}
+
+type countingOSV struct {
+	n int
+}
+
+func (c *countingOSV) Query(_ context.Context, deps []ecosystem.Dependency) (map[string][]lockfile.Vulnerability, error) {
+	c.n += len(deps)
+	return map[string][]lockfile.Vulnerability{}, nil
+}
+
+func TestScanRecordsHealthFromEvidence(t *testing.T) {
+	health := &lockfile.HealthEvidence{Released: "2025-01-31", License: "MIT", Deprecated: "use x"}
+	pol := policy.Default()
+	pol.Rules.Health = policy.HealthRule{Deprecated: "deny"}
+
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:   "../ecosystem/npm/testdata",
+		Policy: pol,
+		Client: fakeOSV{},
+		Evidence: fakeEvidence{
+			"npm:react@19.2.0": {Health: health},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var withHealth int
+	for _, art := range result.Document.Artifacts {
+		switch art.Subject.Name {
+		case "react":
+			withHealth++
+			if art.Evidence.Health == nil || *art.Evidence.Health != *health {
+				t.Fatalf("react health = %+v", art.Evidence.Health)
+			}
+			if art.Trust.Status != lockfile.StatusUntrusted {
+				t.Fatalf("a deprecated release must be untrusted under the rule: %s %v", art.Trust.Status, art.Trust.Reasons)
+			}
+		default:
+			if art.Evidence.Health != nil {
+				t.Fatalf("%s: health must stay nil when nothing was collected: %+v", art.Subject.Name, art.Evidence.Health)
+			}
+		}
+	}
+	if withHealth != 1 {
+		t.Fatalf("react found %d times", withHealth)
+	}
+}
+
+const reachabilityLock = `{
+  "lockfileVersion": 3,
+  "packages": {
+    "": {},
+    "node_modules/app-lib": { "version": "1.0.0", "resolved": "https://registry.npmjs.org/app-lib/-/app-lib-1.0.0.tgz", "dependencies": { "shared": "^1" } },
+    "node_modules/shared": { "version": "1.0.0", "resolved": "https://registry.npmjs.org/shared/-/shared-1.0.0.tgz" },
+    "node_modules/jest": { "version": "29.0.0", "resolved": "https://registry.npmjs.org/jest/-/jest-29.0.0.tgz", "dev": true }
+  }
+}`
+
+func TestScanReachability(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte(reachabilityLock), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	vulns := fakeOSV{vulns: map[string][]lockfile.Vulnerability{
+		"npm:shared@1.0.0": {{ID: "GHSA-shared"}},
+		"npm:jest@29.0.0":  {{ID: "GHSA-jest"}},
+	}}
+
+	scan := func(reach bool) lockfile.Document {
+		result, err := scanner.Scan(context.Background(), scanner.Options{
+			Path:         dir,
+			Policy:       policy.Default(),
+			Client:       vulns,
+			Evidence:     fakeEvidence{},
+			Reachability: reach,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result.Document
+	}
+
+	off := scan(false)
+	for _, art := range off.Artifacts {
+		if art.Scope != "" || len(art.Dependencies) != 0 {
+			t.Fatalf("%s: scope and dependencies must be left out by default: %+v", art.Subject.Name, art)
+		}
+		for _, v := range art.Evidence.Vulnerabilities.Items {
+			if v.Reachable != "" || v.Via != nil {
+				t.Fatalf("%s: reachability must be left out by default: %+v", art.Subject.Name, v)
+			}
+		}
+	}
+
+	on := scan(true)
+	byName := map[string]lockfile.Artifact{}
+	for _, art := range on.Artifacts {
+		byName[art.Subject.Name] = art
+	}
+	if got := byName["app-lib"]; got.Scope != lockfile.ScopeRuntime || len(got.Dependencies) != 1 || got.Dependencies[0] != "npm:shared@1.0.0" {
+		t.Fatalf("app-lib = %+v", got)
+	}
+	shared := byName["shared"].Evidence.Vulnerabilities.Items[0]
+	if shared.Reachable != lockfile.ReachYes || len(shared.Via) != 2 || shared.Via[0] != "npm:app-lib@1.0.0" {
+		t.Fatalf("shared vulnerability = %+v", shared)
+	}
+	jest := byName["jest"].Evidence.Vulnerabilities.Items[0]
+	if byName["jest"].Scope != lockfile.ScopeDev || jest.Reachable != lockfile.ReachNo {
+		t.Fatalf("jest = %+v, vulnerability %+v", byName["jest"], jest)
+	}
+}
+
+type detailingOSV struct {
+	fakeOSV
+	details map[string]osv.Detail
+}
+
+func (d detailingOSV) Details(_ context.Context, ids []string) (map[string]osv.Detail, error) {
+	out := map[string]osv.Detail{}
+	for _, id := range ids {
+		if detail, ok := d.details[id]; ok {
+			out[id] = detail
+		}
+	}
+	return out, nil
+}
+
+func TestScanRecordsSeverityAndFixedVersion(t *testing.T) {
+	client := detailingOSV{
+		fakeOSV: fakeOSV{vulns: map[string][]lockfile.Vulnerability{
+			"npm:react@19.2.0": {{ID: "GHSA-1"}, {ID: "GHSA-nodetail"}, {ID: "MAL-1"}},
+		}},
+		details: map[string]osv.Detail{
+			"GHSA-1": {Severity: "high", Affected: []osv.Affected{{
+				Ecosystem: "npm", Name: "react",
+				Ranges: []osv.Range{{Type: "SEMVER", Events: []osv.Event{{Introduced: "0"}, {Fixed: "19.2.1"}}}},
+			}}},
+		},
+	}
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path: "../ecosystem/npm/testdata", Policy: policy.Default(), Client: client, Evidence: fakeEvidence{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, art := range result.Document.Artifacts {
+		if art.Subject.Name != "react" {
+			continue
+		}
+		items := art.Evidence.Vulnerabilities.Items
+		if len(items) != 2 {
+			t.Fatalf("items = %+v (malicious reports are kept apart)", items)
+		}
+		got := map[string]lockfile.Vulnerability{}
+		for _, v := range items {
+			got[v.ID] = v
+		}
+		if v := got["GHSA-1"]; v.Severity != lockfile.SeverityHigh || len(v.Fixed) != 1 || v.Fixed[0] != "19.2.1" {
+			t.Fatalf("GHSA-1 = %+v", v)
+		}
+		if v := got["GHSA-nodetail"]; v.Severity != "" || v.Fixed != nil {
+			t.Fatalf("an advisory without detail stays bare: %+v", v)
+		}
+		return
+	}
+	t.Fatal("react not found")
+}
+
+func TestScanWorksWithAClientThatCannotLookUpAdvisories(t *testing.T) {
+	result, err := scanner.Scan(context.Background(), scanner.Options{
+		Path: "../ecosystem/npm/testdata", Policy: policy.Default(), Evidence: fakeEvidence{},
+		Client: fakeOSV{vulns: map[string][]lockfile.Vulnerability{"npm:react@19.2.0": {{ID: "GHSA-1"}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, art := range result.Document.Artifacts {
+		for _, v := range art.Evidence.Vulnerabilities.Items {
+			if v.Severity != "" || v.Fixed != nil {
+				t.Fatalf("unexpected detail: %+v", v)
+			}
+		}
+	}
+}
+
+// rendezvousOSV answers only once the evidence collector has started, so a scan that runs
+// the two one after the other never finishes.
+type rendezvousOSV struct {
+	started <-chan struct{}
+	err     error
+}
+
+func (r rendezvousOSV) Query(ctx context.Context, deps []ecosystem.Dependency) (map[string][]lockfile.Vulnerability, error) {
+	select {
+	case <-r.started:
+	case <-ctx.Done():
+		// Once collection has started, this fake models an independent OSV
+		// result, even if the sibling's failure has already canceled the context.
+		select {
+		case <-r.started:
+		default:
+			return nil, ctx.Err()
+		}
+	case <-time.After(5 * time.Second):
+		return nil, errors.New("evidence collection did not start while OSV was queried")
+	}
+	if r.err != nil {
+		return nil, r.err
+	}
+	return map[string][]lockfile.Vulnerability{}, nil
+}
+
+type signalEvidence struct {
+	started chan<- struct{}
+	err     error
+}
+
+func (s signalEvidence) Collect(_ context.Context, _ []ecosystem.Dependency) (map[string]evidence.Record, error) {
+	close(s.started)
+	return map[string]evidence.Record{}, s.err
+}
+
+func TestScanRunsEvidenceAlongsideOSV(t *testing.T) {
+	started := make(chan struct{})
+	_, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     "../ecosystem/npm/testdata",
+		Policy:   policy.Default(),
+		Client:   rendezvousOSV{started: started},
+		Evidence: signalEvidence{started: started},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestScanReportsOSVErrorOverEvidenceError(t *testing.T) {
+	started := make(chan struct{})
+	osvErr := errors.New("osv down")
+	_, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     "../ecosystem/npm/testdata",
+		Policy:   policy.Default(),
+		Client:   rendezvousOSV{started: started, err: osvErr},
+		Evidence: signalEvidence{started: started, err: errors.New("evidence down")},
+	})
+	if !errors.Is(err, osvErr) {
+		t.Fatalf("err = %v, want %v", err, osvErr)
+	}
+}
+
+type canceledOSV struct{}
+
+func (canceledOSV) Query(ctx context.Context, _ []ecosystem.Dependency) (map[string][]lockfile.Vulnerability, error) {
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("OSV query: %w", ctx.Err())
+	case <-time.After(5 * time.Second):
+		return nil, errors.New("OSV query was not canceled")
+	}
+}
+
+type canceledEvidence struct{ started chan<- struct{} }
+
+func (c canceledEvidence) Collect(ctx context.Context, _ []ecosystem.Dependency) (map[string]evidence.Record, error) {
+	close(c.started)
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("evidence collection: %w", ctx.Err())
+	case <-time.After(5 * time.Second):
+		return nil, errors.New("evidence collection was not canceled")
+	}
+}
+
+func TestScanReportsEvidenceErrorOverCanceledOSV(t *testing.T) {
+	evErr := fmt.Errorf("evidence collection: %w", errors.New("evidence down"))
+	_, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     "../ecosystem/npm/testdata",
+		Policy:   policy.Default(),
+		Client:   canceledOSV{},
+		Evidence: signalEvidence{started: make(chan struct{}), err: evErr},
+	})
+	if !errors.Is(err, evErr) {
+		t.Fatalf("err = %v, want %v", err, evErr)
+	}
+}
+
+func TestScanCancelsEvidenceOnOSVError(t *testing.T) {
+	started := make(chan struct{})
+	osvErr := errors.New("osv down")
+	_, err := scanner.Scan(context.Background(), scanner.Options{
+		Path:     "../ecosystem/npm/testdata",
+		Policy:   policy.Default(),
+		Client:   rendezvousOSV{started: started, err: osvErr},
+		Evidence: canceledEvidence{started: started},
+	})
+	if !errors.Is(err, osvErr) {
+		t.Fatalf("err = %v, want %v", err, osvErr)
+	}
+}
+
+func TestScanPreservesParentCancellation(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		t.Run(fmt.Sprintf("deadline=%t", deadline), func(t *testing.T) {
+			var ctx context.Context
+			if deadline {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithDeadline(context.Background(), time.Unix(0, 0))
+				defer cancel()
+			} else {
+				var cancel context.CancelCauseFunc
+				ctx, cancel = context.WithCancelCause(context.Background())
+				cancel(errors.New("caller stopped the scan"))
+			}
+			_, err := scanner.Scan(ctx, scanner.Options{
+				Path:     "../ecosystem/npm/testdata",
+				Policy:   policy.Default(),
+				Client:   canceledOSV{},
+				Evidence: signalEvidence{started: make(chan struct{}), err: errors.New("evidence down")},
+			})
+			if !errors.Is(err, ctx.Err()) {
+				t.Fatalf("err = %v, want %v", err, ctx.Err())
+			}
+		})
+	}
+}

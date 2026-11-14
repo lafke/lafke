@@ -1,0 +1,51 @@
+# Lockfile
+
+`lafke.lock` is the canonical trust snapshot for a project.
+
+See [specification.md](specification.md) for the v3 format. Older
+`version: 1` files are migrated in memory on read; run `lafke lock`
+to persist a refreshed v3 snapshot.
+
+## Commands
+
+```bash
+lafke scan
+lafke lock
+lafke diff
+lafke verify
+lafke explain <package>
+lafke version
+```
+
+`scan` inspects the tree (and is the default command). `lock` writes
+the file. `diff` shows what changed. `verify` fails when there is
+trust-relevant drift against the lockfile. `scan` fails on current
+policy violations even when those states are already locked. The
+GitHub Action default runs `scan`, `diff`, and `verify`. `explain`
+prints a trust checklist for one package: digest, source, provenance,
+signature, trust chain, ownership, capabilities, vulnerabilities, and
+malicious-package reports.
+
+Shared flags: `--offline`, `--network`, `--policy`, `--profile`, `--lock`,
+`--format`, `--no-fail`.
+
+Exit codes:
+
+- `0` success / no trust drift
+- `1` trust violation
+- `2` configuration or operational error
+
+`scan --format json` emits the lock document. `diff` and `verify`
+print a `schema_version: 1` report. `explain --format json` emits the
+matched artifacts. JSON Schemas live in `schemas/`.
+
+## Identity
+
+Subject identity is `ecosystem:name`. Version is recorded on the
+artifact, not in the identity. A bump from `react@19.1.0` to
+`react@19.2.0` is a change to one subject, not a delete plus an add.
+
+## Determinism
+
+The same inputs must produce the same bytes. The lockfile does not
+store timestamps, absolute paths, or advisory `modified` times.

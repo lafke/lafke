@@ -1,0 +1,409 @@
+package scanner_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/lafke/cli/internal/scanner"
+	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/cli/pkg/policy"
+)
+
+func TestPrivacyMatrix(t *testing.T) {
+	cases := []struct {
+		name      string
+		files     map[string]string
+		homeFiles map[string]string
+		scan      string
+		wantN     int
+		wantAll   lockfile.VulnState
+	}{
+		{
+			name: "npm public registry",
+			files: map[string]string{
+				"package-lock.json": `{
+  "name": "fixture",
+  "lockfileVersion": 3,
+  "packages": {
+    "node_modules/react": {
+      "version": "19.2.0",
+      "resolved": "https://registry.npmjs.org/react/-/react-19.2.0.tgz",
+      "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="
+    }
+  }
+}`,
+			},
+			wantN:   1,
+			wantAll: lockfile.VulnChecked,
+		},
+		{
+			name: "npm private registry",
+			files: map[string]string{
+				"package-lock.json": `{
+  "name": "fixture",
+  "lockfileVersion": 3,
+  "packages": {
+    "node_modules/@company/internal-auth": {
+      "version": "1.0.0",
+      "resolved": "https://npm.company.example/@company/internal-auth/-/internal-auth-1.0.0.tgz"
+    }
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "npm unknown registry",
+			files: map[string]string{
+				"package-lock.json": `{
+  "name": "fixture",
+  "lockfileVersion": 3,
+  "packages": {
+    "node_modules/secret-sdk": { "version": "1.0.0" }
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "npm file and git",
+			files: map[string]string{
+				"package-lock.json": `{
+  "name": "fixture",
+  "lockfileVersion": 3,
+  "packages": {
+    "node_modules/local-pkg": { "version": "0.0.1", "resolved": "file:packages/local-pkg" },
+    "node_modules/from-git": { "version": "1.0.0", "resolved": "git+https://github.com/example/from-git.git#deadbeef" }
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "yarn workspace",
+			files: map[string]string{
+				"yarn.lock": `__metadata:
+  version: 8
+"local-pkg@workspace:packages/local-pkg":
+  version: 0.0.1
+  resolution: "local-pkg@workspace:packages/local-pkg"
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "yarn private scope",
+			files: map[string]string{
+				"yarn.lock": `__metadata:
+  version: 8
+"@company/internal-auth@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@company/internal-auth@npm:1.0.0"
+`,
+				".yarnrc.yml": "npmRegistryServer: https://registry.npmjs.org\nnpmScopes:\n  company:\n    npmRegistryServer: https://npm.company.example\n",
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "yarn berry default registry",
+			files: map[string]string{
+				"yarn.lock": `__metadata:
+  version: 8
+"react@npm:19.2.0":
+  version: 19.2.0
+  resolution: "react@npm:19.2.0"
+`,
+			},
+			wantN:   1,
+			wantAll: lockfile.VulnChecked,
+		},
+		{
+			name: "deno default npm registry",
+			files: map[string]string{
+				"deno.lock": `{
+  "version": "5",
+  "npm": {
+    "react@19.2.0": { "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+  }
+}`,
+			},
+			wantN:   1,
+			wantAll: lockfile.VulnChecked,
+		},
+		{
+			name: "deno private npmrc",
+			files: map[string]string{
+				"deno.lock": `{
+  "version": "5",
+  "npm": {
+    "react@19.2.0": { "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+  }
+}`,
+				".npmrc": "registry=https://npm.company.example/\n",
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "deno home private npmrc",
+			homeFiles: map[string]string{
+				".npmrc": "registry=https://npm.company.example/\n",
+			},
+			files: map[string]string{
+				"deno.lock": `{
+  "version": "5",
+  "npm": {
+    "react@19.2.0": { "integrity": "sha256-n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "yarn parent private scope",
+			scan: "apps/web",
+			files: map[string]string{
+				".yarnrc.yml": "npmRegistryServer: https://registry.npmjs.org\nnpmScopes:\n  company:\n    npmRegistryServer: https://npm.company.example\n",
+				"apps/web/yarn.lock": `__metadata:
+  version: 8
+"@company/internal-auth@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@company/internal-auth@npm:1.0.0"
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "pdm private index",
+			files: map[string]string{
+				"pdm.lock": `[[package]]
+name = "secret-sdk"
+version = "1.0.0"
+files = [
+    {file = "secret-sdk-1.0.0.tar.gz", url = "https://pypi.company.example/packages/secret-sdk-1.0.0.tar.gz", hash = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+]
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "pdm default index",
+			files: map[string]string{
+				"pdm.lock": `[[package]]
+name = "requests"
+version = "2.32.3"
+files = [
+    {file = "requests-2.32.3.tar.gz", hash = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+]
+`,
+			},
+			wantN:   1,
+			wantAll: lockfile.VulnChecked,
+		},
+		{
+			name: "pdm pyproject private source",
+			files: map[string]string{
+				"pdm.lock": `[[package]]
+name = "secret-sdk"
+version = "1.0.0"
+files = [
+    {file = "secret-sdk-1.0.0.tar.gz", hash = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+]
+`,
+				"pyproject.toml": `[[tool.pdm.source]]
+name = "internal"
+url = "https://pypi.company.example/simple"
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "nuget private feed",
+			files: map[string]string{
+				"packages.lock.json": `{
+  "version": 1,
+  "dependencies": {
+    "net8.0": {
+      "Secret.Sdk": { "type": "Direct", "resolved": "1.0.0", "contentHash": "n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+    }
+  }
+}`,
+				"nuget.config": `<?xml version="1.0"?><configuration><packageSources><add key="company" value="https://nuget.company.example/v3/index.json" /></packageSources></configuration>`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "nuget parent private feed",
+			scan: "apps/api",
+			homeFiles: map[string]string{
+				".nuget/NuGet/NuGet.Config": `<?xml version="1.0"?><configuration><packageSources><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources></configuration>`,
+			},
+			files: map[string]string{
+				"NuGet.Config": `<?xml version="1.0"?><configuration><packageSources><add key="company" value="https://nuget.company.example/v3/index.json" /></packageSources></configuration>`,
+				"apps/api/packages.lock.json": `{
+  "version": 1,
+  "dependencies": {
+    "net8.0": {
+      "Secret.Sdk": { "type": "Direct", "resolved": "1.0.0", "contentHash": "n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=" }
+    }
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "hex organization",
+			files: map[string]string{
+				"mix.lock": `%{
+  "secret": {:hex, :secret, "1.0.0", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", [:mix], [], "acme", "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+}
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "renv non-cran repository",
+			files: map[string]string{
+				"renv.lock": `{
+  "R": {"Repositories": [{"Name": "CRAN", "URL": "https://packagemanager.posit.co/cran/latest"}]},
+  "Packages": {
+    "secret": {"Package": "secret", "Version": "1.0.0", "Source": "Repository", "Repository": "CRAN"},
+    "bio": {"Package": "bio", "Version": "1.0.0", "Source": "Bioconductor", "Repository": "Bioconductor 3.18"}
+  }
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "julia manifest without a proven registry",
+			files: map[string]string{
+				"Manifest.toml": `manifest_format = "2.0"
+
+[[deps.Secret]]
+git-tree-sha1 = "0123456789abcdef0123456789abcdef01234567"
+uuid = "11111111-2222-3333-4444-555555555555"
+version = "1.0.0"
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "cabal freeze with another repository",
+			files: map[string]string{
+				"cabal.project.freeze": "active-repositories: hackage.haskell.org:merge, corp:rest\nconstraints: any.secret ==1.0.0\n",
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "poetry private source",
+			files: map[string]string{
+				"poetry.lock": `[[package]]
+name = "secret-sdk"
+version = "1.0.0"
+files = [
+    {file = "secret-sdk-1.0.0.tar.gz", hash = "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.company.example/simple"
+`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+		{
+			name: "composer private repository",
+			files: map[string]string{
+				"composer.lock": `{
+  "packages": [
+    {
+      "name": "company/secret-sdk",
+      "version": "1.0.0",
+      "notification-url": "https://composer.company.example/downloads/",
+      "dist": { "type": "zip", "url": "https://api.github.com/repos/company/secret-sdk/zipball/abc", "shasum": "" }
+    }
+  ]
+}`,
+			},
+			wantN:   0,
+			wantAll: lockfile.VulnUnknown,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			t.Setenv("USERPROFILE", home)
+			t.Setenv("APPDATA", home)
+			t.Setenv("LOCALAPPDATA", home)
+			t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+			t.Setenv("XDG_CONFIG_DIRS", filepath.Join(home, "xdg"))
+			t.Setenv("ProgramData", filepath.Join(home, "ProgramData"))
+			t.Setenv("npm_config_registry", "")
+			t.Setenv("NPM_CONFIG_REGISTRY", "")
+			t.Setenv("PDM_PYPI_URL", "")
+			writeFiles(t, home, tc.homeFiles)
+
+			dir := t.TempDir()
+			writeFiles(t, dir, tc.files)
+			scan := dir
+			if tc.scan != "" {
+				scan = filepath.Join(dir, tc.scan)
+			}
+
+			client := &countingOSV{}
+			result, err := scanner.Scan(context.Background(), scanner.Options{
+				Path:     scan,
+				Policy:   policy.Default(),
+				Client:   client,
+				Evidence: fakeEvidence{},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if client.n != tc.wantN {
+				t.Fatalf("queried %d, want %d", client.n, tc.wantN)
+			}
+			if len(result.Document.Artifacts) == 0 {
+				t.Fatal("no artifacts")
+			}
+			for _, art := range result.Document.Artifacts {
+				if art.Evidence.Vulnerabilities.State != tc.wantAll {
+					t.Fatalf("%s state = %s, want %s", art.Subject.Name, art.Evidence.Vulnerabilities.State, tc.wantAll)
+				}
+			}
+		})
+	}
+}
+
+func writeFiles(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for name, raw := range files {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

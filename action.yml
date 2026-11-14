@@ -1,0 +1,201 @@
+name: Lafke
+description: Run lafke scan/diff/verify for policy violations and trust drift
+author: lafke
+branding:
+  icon: shield
+  color: gray-dark
+inputs:
+  path:
+    description: Project directory
+    default: "."
+  command:
+    description: "scan, verify, diff, audit, sast, security (dependencies, source, secrets and infrastructure in one report), both (diff+verify), or all (scan+diff+verify)"
+    default: all
+  policy:
+    description: Path to a policy file (mutually exclusive with profile)
+    default: ""
+  profile:
+    description: Built-in policy profile (default or strict; mutually exclusive with policy)
+    default: ""
+  offline:
+    description: Skip remote vulnerability lookups
+    default: "false"
+  reachability:
+    description: Pass --reachability, so vulnerabilities in development-only dependencies are marked and lowered by audit
+    default: "false"
+  min-release-age:
+    description: "audit only: report releases newer than this as high findings, such as 7d (npm and PyPI)"
+    default: ""
+  prioritize:
+    description: "audit only: pass --prioritize, so vulnerabilities in CISA KEV or with an EPSS score of 50% or more are raised (sends CVE IDs to OSV, CISA and FIRST)"
+    default: "false"
+  import-sarif:
+    description: "sast and security only: SARIF reports from other scanners to merge into the sast report, one path per line, relative to the repository root"
+    default: ""
+  scorecard:
+    description: "audit only: pass --scorecard, so the per-check minimums in rules.health.scorecard_checks are applied (sends package names to deps.dev)"
+    default: "false"
+  min-scorecard:
+    description: "audit only: report packages whose source repository has an OpenSSF Scorecard below this score (0 to 10), such as 5 (sends package names to deps.dev)"
+    default: ""
+  sarif:
+    description: Upload an audit report (a sast or security report when command is sast or security) to GitHub code scanning (needs security-events write permission)
+    default: "false"
+  sbom:
+    description: Write the lockfile as a CycloneDX SBOM and return its path in the sbom-file output
+    default: "false"
+  report-format:
+    description: "Format of the report in the job summary and pull request comment: text (a code block) or markdown (a findings table)"
+    default: text
+  comment:
+    description: Comment a trust report on pull requests
+    default: "true"
+  token:
+    description: GitHub token for PR comments and release downloads
+    default: ${{ github.token }}
+  version:
+    description: Lafke release tag to install. Empty uses a v* action ref, otherwise builds from source.
+    default: ""
+outputs:
+  sarif-file:
+    description: Path of the SARIF report, when sarif is enabled
+    value: ${{ steps.run.outputs.sarif-file }}
+  sbom-file:
+    description: Path of the CycloneDX SBOM, when sbom is enabled
+    value: ${{ steps.run.outputs.sbom-file }}
+runs:
+  using: composite
+  steps:
+    - name: Resolve install mode
+      id: mode
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        version="${INPUT_VERSION:-}"
+        if [ -z "$version" ]; then
+          case "${GITHUB_ACTION_REF:-}" in
+            v[0-9]*.[0-9]*) version="${GITHUB_ACTION_REF}" ;;
+          esac
+        fi
+        os=$(uname -s)
+        case "$os" in
+          Linux|Darwin) unix=1 ;;
+          *) unix=0 ;;
+        esac
+        if [ -n "$version" ] && [ "$unix" = 1 ]; then
+          echo "mode=release" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+        else
+          echo "mode=source" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Resolve Go module files
+      if: ${{ steps.mode.outputs.mode == 'source' }}
+      id: gomod
+      shell: bash
+      run: |
+        set -euo pipefail
+        action_root=$(cd "${GITHUB_ACTION_PATH}" && pwd)
+        echo "root=${action_root}" >> "$GITHUB_OUTPUT"
+        echo "mod=${action_root}/go.mod" >> "$GITHUB_OUTPUT"
+        echo "sum=${action_root}/go.sum" >> "$GITHUB_OUTPUT"
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      if: ${{ steps.mode.outputs.mode == 'source' }}
+      with:
+        go-version-file: ${{ steps.gomod.outputs.mod }}
+        cache-dependency-path: ${{ steps.gomod.outputs.sum }}
+    - name: Install lafke from source
+      if: ${{ steps.mode.outputs.mode == 'source' }}
+      shell: bash
+      run: go install ./cmd/lafke
+      working-directory: ${{ steps.gomod.outputs.root }}
+    - name: Install lafke
+      if: ${{ steps.mode.outputs.mode == 'release' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        VERSION: ${{ steps.mode.outputs.version }}
+        INSTALL_DIR: ${{ runner.temp }}/lafke-bin
+        REPO: ${{ github.action_repository }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$INSTALL_DIR"
+        "${GITHUB_ACTION_PATH}/scripts/install.sh"
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+    - name: Run lafke
+      id: run
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        WORKDIR: ${{ inputs.path }}
+        OFFLINE: ${{ inputs.offline }}
+        POLICY: ${{ inputs.policy }}
+        PROFILE: ${{ inputs.profile }}
+        REACHABILITY: ${{ inputs.reachability }}
+        MIN_RELEASE_AGE: ${{ inputs.min-release-age }}
+        PRIORITIZE: ${{ inputs.prioritize }}
+        MIN_SCORECARD: ${{ inputs.min-scorecard }}
+        SCORECARD: ${{ inputs.scorecard }}
+        IMPORT_SARIF: ${{ inputs.import-sarif }}
+        SARIF_FILE: ${{ inputs.sarif == 'true' && format('{0}/lafke.sarif', runner.temp) || '' }}
+        REPORT_FORMAT: ${{ inputs.report-format }}
+        SBOM_FILE: ${{ inputs.sbom == 'true' && format('{0}/lafke.cdx.json', runner.temp) || '' }}
+        LAFKE_REPORT: ${{ runner.temp }}/lafke-report.txt
+      run: "${{ github.action_path }}/action/run.sh"
+    - name: Upload SARIF to code scanning
+      if: ${{ always() && inputs.sarif == 'true' && steps.run.outputs.sarif-file != '' }}
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      with:
+        sarif_file: ${{ steps.run.outputs.sarif-file }}
+        category: lafke
+    - name: Comment trust report
+      if: ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' && steps.run.outcome != 'skipped' }}
+      continue-on-error: true
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        LAFKE_REPORT: ${{ runner.temp }}/lafke-report.txt
+        REPORT_FORMAT: ${{ inputs.report-format }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const fs = require('fs');
+          const path = process.env.LAFKE_REPORT;
+          let report = '(no report)';
+          if (path && fs.existsSync(path)) {
+            report = fs.readFileSync(path, 'utf8').trim() || '(empty report)';
+          }
+          const fence = process.env.REPORT_FORMAT === 'markdown' ? [] : ['```'];
+          const body = [
+            '## Lafke Trust Report',
+            '',
+            ...fence,
+            report,
+            ...fence,
+          ].join('\n');
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find((c) => c.body && c.body.startsWith('## Lafke Trust Report'));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+            return;
+          }
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body,
+          });
+    - name: Fail on policy violations or trust drift
+      if: ${{ steps.run.outputs.failed == 'true' }}
+      shell: bash
+      run: exit 1

@@ -1,0 +1,73 @@
+package cli
+
+import (
+	"fmt"
+	"slices"
+	"strings"
+
+	"github.com/lafke/cli/internal/diff"
+	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/cli/internal/lock"
+	"github.com/lafke/cli/internal/policy"
+	"github.com/lafke/cli/internal/scanner"
+	"github.com/spf13/cobra"
+)
+
+func newVerifyCommand(opts *options) *cobra.Command {
+	return &cobra.Command{
+		Use:   "verify [path]",
+		Short: "Verify the current project against lafke.lock",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			path := projectPath(args)
+			pol, err := policy.LoadWithProfile(opts.policy, opts.profile)
+			if err != nil {
+				return opErr(err)
+			}
+			net, err := scanOptions(opts, pol)
+			if err != nil {
+				return err
+			}
+
+			lockPath := lock.Path(path, opts.lockPath)
+			locked, migrated, err := lock.Read(lockPath)
+			if err != nil {
+				return opErr(err)
+			}
+			if migrated {
+				fmt.Fprintln(cmd.ErrOrStderr(), lock.MigrationWarning)
+			}
+
+			result, err := scanner.Scan(cmd.Context(), scanner.Options{Attestations: opts.attestations, SignerKey: opts.signerKey,
+				Path:         path,
+				Offline:      opts.offline,
+				Network:      net,
+				Policy:       pol,
+				Reachability: opts.reachability,
+			})
+			if err != nil {
+				return opErr(err)
+			}
+
+			got := diff.Compare(locked, result.Document).WithPolicy(pol)
+			switch {
+			case strings.ToLower(opts.format) == "json":
+				if err := diff.WriteJSON(cmd.OutOrStdout(), got); err != nil {
+					return opErr(err)
+				}
+			case slices.Contains([]string{"sarif", "junit", "markdown", "md"}, strings.ToLower(opts.format)):
+				if err := finding.Write(cmd.OutOrStdout(), got.Findings("verify").WithLocation(reportLocation(path, opts.lockPath)), opts.format); err != nil {
+					return opErr(err)
+				}
+			case !got.TrustDrift():
+				fmt.Fprintf(cmd.OutOrStdout(), "ok  %d artifacts\n", len(result.Document.Artifacts))
+			default:
+				diff.Write(cmd.OutOrStdout(), got)
+			}
+			if opts.noFail || !got.TrustDrift() {
+				return nil
+			}
+			return trustErr("trust drift detected")
+		},
+	}
+}

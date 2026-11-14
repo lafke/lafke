@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+command="${COMMAND:-all}"
+workdir="${WORKDIR:-.}"
+offline="${OFFLINE:-false}"
+policy="${POLICY:-}"
+profile="${PROFILE:-}"
+reachability="${REACHABILITY:-false}"
+min_release_age="${MIN_RELEASE_AGE:-}"
+prioritize="${PRIORITIZE:-false}"
+min_scorecard="${MIN_SCORECARD:-}"
+scorecard="${SCORECARD:-false}"
+import_sarif="${IMPORT_SARIF:-}"
+sarif_file="${SARIF_FILE:-}"
+sbom_file="${SBOM_FILE:-}"
+report_format="${REPORT_FORMAT:-text}"
+report="${LAFKE_REPORT:?LAFKE_REPORT is required}"
+
+origin="$PWD"
+cd "$workdir"
+
+if [ -n "$policy" ] && [ -n "$profile" ]; then
+  echo "policy and profile are mutually exclusive" | tee "$report" >&2
+  echo "failed=true" >>"$GITHUB_OUTPUT"
+  exit 1
+fi
+
+flags=()
+if [ "$offline" = "true" ]; then
+  flags+=(--offline)
+fi
+if [ -n "$policy" ]; then
+  flags+=(--policy "$policy")
+fi
+if [ -n "$profile" ]; then
+  flags+=(--profile "$profile")
+fi
+if [ "$reachability" = "true" ]; then
+  flags+=(--reachability)
+fi
+
+# The SARIF and SBOM runs below pick their own format, so they only get the shared flags.
+common_flags=(${flags[@]+"${flags[@]}"})
+case "$report_format" in
+  text) ;;
+  markdown) flags+=(--format markdown) ;;
+  *)
+    echo "unknown report-format: $report_format" | tee "$report" >&2
+    echo "failed=true" >>"$GITHUB_OUTPUT"
+    exit 1
+    ;;
+esac
+
+# Flags only audit understands.
+audit_flags=()
+if [ -n "$min_release_age" ]; then
+  audit_flags+=(--min-release-age "$min_release_age")
+fi
+if [ "$prioritize" = "true" ]; then
+  audit_flags+=(--prioritize)
+fi
+if [ -n "$min_scorecard" ]; then
+  audit_flags+=(--min-scorecard "$min_scorecard")
+fi
+if [ "$scorecard" = "true" ]; then
+  audit_flags+=(--scorecard)
+fi
+
+# Flags the source analysis commands (sast, security) understand. The reports are named relative to where the job started, which
+# is not where this script runs, so relative paths are anchored there.
+sast_flags=()
+while IFS= read -r file; do
+  file="${file#"${file%%[![:space:]]*}"}"
+  file="${file%"${file##*[![:space:]]}"}"
+  [ -n "$file" ] || continue
+  case "$file" in
+    /*) ;;
+    *) file="$origin/$file" ;;
+  esac
+  sast_flags+=(--import "$file")
+done <<<"$import_sarif"
+
+: >"$report"
+failed=false
+
+run_cmd() {
+  local name="$1"
+  shift
+  {
+    # Markdown reports carry their own heading.
+    if [ "$report_format" = text ]; then
+      echo "$name"
+      echo
+    fi
+    if [ "${#flags[@]}" -eq 0 ]; then
+      "$@"
+    else
+      "$@" "${flags[@]}"
+    fi
+  } >>"$report" 2>&1 && return 0
+  failed=true
+  return 0
+}
+
+case "$command" in
+  scan)
+    run_cmd "lafke scan" lafke scan
+    ;;
+  diff)
+    run_cmd "lafke diff" lafke diff
+    ;;
+  verify)
+    run_cmd "lafke verify" lafke verify
+    ;;
+  audit)
+    run_cmd "lafke audit" lafke audit ${audit_flags[@]+"${audit_flags[@]}"}
+    ;;
+  sast)
+    run_cmd "lafke sast" lafke sast ${sast_flags[@]+"${sast_flags[@]}"}
+    ;;
+  security)
+    # One report for dependencies, source, secrets and infrastructure. It is not part of
+    # all, which keeps running scan, diff and verify for existing workflows.
+    run_cmd "lafke security" lafke security ${sast_flags[@]+"${sast_flags[@]}"}
+    ;;
+  both)
+    # Drift-only path for callers that intentionally skip current-state
+    # policy checks (for example offline fixtures with unknown evidence).
+    run_cmd "lafke diff" lafke diff
+    echo >>"$report"
+    run_cmd "lafke verify" lafke verify
+    ;;
+  all)
+    run_cmd "lafke scan" lafke scan
+    echo >>"$report"
+    run_cmd "lafke diff" lafke diff
+    echo >>"$report"
+    run_cmd "lafke verify" lafke verify
+    ;;
+  *)
+    echo "unknown command: $command" | tee "$report" >&2
+    echo "failed=true" >>"$GITHUB_OUTPUT"
+    exit 1
+    ;;
+esac
+
+# Optional artifacts. They are written from the directory the job started in, so paths in
+# the SARIF report are relative to the repository root, which code scanning needs.
+if [ -n "$sarif_file" ]; then
+  # The code scanning report matches the command: source findings for sast, the unified
+  # report for security, dependency findings for everything else.
+  sarif_cmd=audit
+  sarif_flags=(${audit_flags[@]+"${audit_flags[@]}"})
+  if [ "$command" = "sast" ] || [ "$command" = "security" ]; then
+    sarif_cmd="$command"
+    sarif_flags=(${sast_flags[@]+"${sast_flags[@]}"})
+  fi
+  # --no-fail: the report is for code scanning; the step above decides pass or fail.
+  if (cd "$origin" && lafke "$sarif_cmd" "$workdir" --format sarif --output "$sarif_file" --no-fail \
+      ${common_flags[@]+"${common_flags[@]}"} ${sarif_flags[@]+"${sarif_flags[@]}"}) >>"$report" 2>&1; then
+    echo "sarif-file=$sarif_file" >>"$GITHUB_OUTPUT"
+  else
+    echo "lafke $sarif_cmd --format sarif failed" >>"$report"
+    failed=true
+  fi
+fi
+if [ -n "$sbom_file" ]; then
+  if lafke sbom export ${common_flags[@]+"${common_flags[@]}"} >"$sbom_file" 2>>"$report"; then
+    echo "sbom-file=$sbom_file" >>"$GITHUB_OUTPUT"
+  else
+    echo "lafke sbom export failed" >>"$report"
+    failed=true
+  fi
+fi
+
+cat "$report"
+
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  {
+    echo "## Lafke Trust Report"
+    echo
+    if [ "$report_format" = markdown ]; then
+      cat "$report"
+    else
+      echo '```'
+      cat "$report"
+      echo '```'
+    fi
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
+
+if [ "$failed" = true ]; then
+  echo "failed=true" >>"$GITHUB_OUTPUT"
+else
+  echo "failed=false" >>"$GITHUB_OUTPUT"
+fi

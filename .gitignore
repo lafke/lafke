@@ -1,0 +1,7 @@
+dist/
+/lafke
+/lafke.exe
+*.test
+coverage.out
+.DS_Store
+scripts/node_modules/

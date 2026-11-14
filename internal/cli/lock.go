@@ -1,0 +1,58 @@
+package cli
+
+import (
+	"fmt"
+
+	"github.com/lafke/cli/internal/lock"
+	"github.com/lafke/cli/internal/policy"
+	"github.com/lafke/cli/internal/scanner"
+	"github.com/spf13/cobra"
+)
+
+func newLockCommand(opts *options) *cobra.Command {
+	return &cobra.Command{
+		Use:   "lock [path]",
+		Short: "Write a language-agnostic lafke.lock",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			path := projectPath(args)
+			pol, err := policy.LoadWithProfile(opts.policy, opts.profile)
+			if err != nil {
+				return opErr(err)
+			}
+			net, err := scanOptions(opts, pol)
+			if err != nil {
+				return err
+			}
+
+			result, err := scanner.Scan(cmd.Context(), scanner.Options{Attestations: opts.attestations, SignerKey: opts.signerKey,
+				Path:         path,
+				Offline:      opts.offline,
+				Network:      net,
+				Policy:       pol,
+				Reachability: opts.reachability,
+			})
+			if err != nil {
+				return opErr(err)
+			}
+
+			out := lock.Path(path, opts.lockPath)
+			if err := lock.Write(out, result.Document); err != nil {
+				return opErr(err)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", out)
+
+			_, untrusted, unknown := scanner.Summary(result.Document)
+			if opts.noFail {
+				return nil
+			}
+			if untrusted > 0 {
+				return trustErr("untrusted artifacts: %d", untrusted)
+			}
+			if unknown > 0 {
+				return trustErr("unknown artifacts: %d", unknown)
+			}
+			return nil
+		},
+	}
+}

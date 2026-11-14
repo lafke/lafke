@@ -1,0 +1,560 @@
+package evidence
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/lafke/cli/internal/capability"
+	"github.com/lafke/cli/internal/ecosystem"
+	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/cli/internal/httpx"
+	"github.com/lafke/cli/pkg/lockfile"
+)
+
+const (
+	npmAttestationsPath = "/-/npm/v1/attestations/"
+	maxTarballBytes     = 32 << 20
+)
+
+type NPM struct {
+	HTTP      *http.Client
+	Registry  string
+	UserAgent string
+	Limit     int
+	// SkipTarball disables package source capability scanning.
+	SkipTarball bool
+	// DepsDev is the base URL of the deps.dev API, used only to date a release whose package
+	// document is too large to read. Empty turns the fallback off.
+	DepsDev string
+	// PublicHosts are the registry hosts deps.dev covers; a package from any other registry
+	// is never looked up there. Empty means the public npm registry and Yarn's mirror of it.
+	PublicHosts []string
+
+	keysOnce sync.Once
+	keys     *keyCache
+}
+
+func NewNPM() *NPM {
+	return &NPM{
+		HTTP: &http.Client{
+			Timeout: 20 * time.Second,
+		},
+		Registry:  "https://registry.npmjs.org",
+		UserAgent: "lafke",
+		Limit:     8,
+		DepsDev:   "https://api.deps.dev",
+	}
+}
+
+func (c *NPM) Collect(ctx context.Context, deps []ecosystem.Dependency) (map[string]Record, error) {
+	out := make(map[string]Record)
+	var npmDeps []ecosystem.Dependency
+	for _, dep := range deps {
+		if dep.Ecosystem != "npm" {
+			continue
+		}
+		npmDeps = append(npmDeps, dep)
+	}
+	if len(npmDeps) == 0 {
+		return out, nil
+	}
+
+	limit := c.Limit
+	if limit < 1 {
+		limit = 8
+	}
+	sem := make(chan struct{}, limit)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, dep := range npmDeps {
+		wg.Add(1)
+		go func(dep ecosystem.Dependency) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-sem }()
+
+			rec := c.lookup(ctx, dep)
+			mu.Lock()
+			out[Key(dep)] = rec
+			mu.Unlock()
+		}(dep)
+	}
+	wg.Wait()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *NPM) lookup(ctx context.Context, dep ecosystem.Dependency) Record {
+	// The attestation and version lookups are independent requests, so they overlap.
+	var (
+		prov  lockfile.EvidenceState
+		chain lockfile.ChainEvidence
+		wg    sync.WaitGroup
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		prov, chain = c.attestations(ctx, dep)
+	}()
+	meta, ok := c.versionMeta(ctx, dep)
+	wg.Wait()
+
+	rec := Record{
+		Provenance: prov,
+		Signature:  lockfile.EvidenceUnknown,
+		Capabilities: lockfile.CapabilityEvidence{
+			State: lockfile.CapUnknown,
+		},
+		Behavior: lockfile.BehaviorEvidence{
+			State: lockfile.CapUnknown,
+		},
+		Ownership: lockfile.OwnershipEvidence{
+			State: lockfile.CapUnknown,
+		},
+		Chain: chain,
+	}
+
+	if !ok {
+		return rec
+	}
+	rec.Signature = c.verifySignature(ctx, c.registryFor(dep), dep.Name, dep.Version, meta.Integrity, dep.Digest, meta.Signatures)
+	rec.Ownership = meta.Ownership
+	// The release date does not depend on the tarball, so it is looked up while the tarball
+	// downloads. Every return below waits for it first.
+	waitReleased := func() {}
+	if meta.Health != nil {
+		health := *meta.Health
+		rec.Health = &health
+		released := make(chan string, 1)
+		go func() { released <- c.released(ctx, dep) }()
+		waitReleased = func() { health.Released = <-released }
+	}
+
+	findings := capability.FromMetadata(meta.Capability)
+	// Install scripts imply shell at install time even without a source scan.
+	if findings.InstallScripts {
+		findings.Shell = true
+	}
+
+	switch {
+	case c.SkipTarball:
+		// Explicit metadata-only mode (tests / callers that opt out of
+		// downloading package sources).
+		rec.Capabilities = capability.Evidence(findings)
+		rec.Behavior = capability.Behavior(findings)
+	case meta.Tarball == "":
+		// No source URL: keep CapUnknown rather than claiming checked.
+	default:
+		if err := c.scanTarball(ctx, dep, meta.Tarball, &findings); err != nil {
+			// Fail closed: a scan or digest error must not become CapChecked.
+			waitReleased()
+			return rec
+		}
+		rec.Capabilities = capability.Evidence(findings)
+		rec.Behavior = capability.Behavior(findings)
+	}
+	waitReleased()
+	return rec
+}
+
+type versionMeta struct {
+	Signatures []npmSignature
+	Integrity  string
+	Ownership  lockfile.OwnershipEvidence
+	Capability capability.Metadata
+	Tarball    string
+	Health     *lockfile.HealthEvidence
+}
+
+func (c *NPM) versionMeta(ctx context.Context, dep ecosystem.Dependency) (versionMeta, bool) {
+	endpoint := strings.TrimRight(c.registryFor(dep), "/") + "/" + encodeNPMName(dep.Name) + "/" + url.PathEscape(dep.Version)
+	res, err := c.get(ctx, endpoint)
+	if err != nil {
+		return versionMeta{}, false
+	}
+	defer res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusNotFound:
+		return versionMeta{
+			Ownership: lockfile.OwnershipEvidence{State: lockfile.CapChecked},
+		}, true
+	case http.StatusOK:
+	default:
+		return versionMeta{}, false
+	}
+
+	var parsed npmVersionDoc
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return versionMeta{}, false
+	}
+
+	owner := lockfile.OwnershipEvidence{State: lockfile.CapChecked}
+	if parsed.NPMUser != nil {
+		owner.Publisher = identityName(parsed.NPMUser.Name, parsed.NPMUser.Email)
+	}
+	if owner.Publisher == "" && parsed.Author.Person != nil {
+		owner.Publisher = identityName(parsed.Author.Person.Name, parsed.Author.Person.Email)
+	}
+	for _, m := range parsed.Maintainers {
+		if id := identityName(m.Name, m.Email); id != "" {
+			owner.Maintainers = append(owner.Maintainers, id)
+		}
+	}
+
+	capMeta := capability.Metadata{
+		HasInstallScript: parsed.HasInstallScript,
+		Scripts:          parsed.Scripts,
+		Gypfile:          parsed.Gypfile,
+		Binary:           parsed.Binary != nil,
+		Dependencies:     parsed.Dependencies,
+		OptionalDeps:     parsed.OptionalDependencies,
+		BundledDeps:      parsed.BundleDependencies,
+		Files:            parsed.Files,
+	}
+
+	return versionMeta{
+		Health:     &lockfile.HealthEvidence{Deprecated: npmDeprecated(parsed.Deprecated), License: npmLicense(parsed.License)},
+		Signatures: parsed.Dist.Signatures,
+		Integrity:  parsed.Dist.Integrity,
+		Ownership:  owner,
+		Capability: capMeta,
+		Tarball:    parsed.Dist.Tarball,
+	}, true
+}
+
+// released returns the day this version was published, or "" when it cannot be found.
+//
+// The full package document carries every publish time, but for packages with long
+// histories (react, typescript, webpack) it exceeds the response size limit. Those are
+// dated through deps.dev instead, a small per-version lookup, and only for packages from
+// the public registry. Anything that fails leaves the date unknown rather than guessed.
+func (c *NPM) released(ctx context.Context, dep ecosystem.Dependency) string {
+	registry := c.registryFor(dep)
+	if day := c.packumentRelease(ctx, registry, dep); day != "" {
+		return day
+	}
+	if c.DepsDev != "" && c.publicHost(registry) {
+		return c.depsDevRelease(ctx, dep)
+	}
+	return ""
+}
+
+func (c *NPM) packumentRelease(ctx context.Context, registry string, dep ecosystem.Dependency) string {
+	endpoint := strings.TrimRight(registry, "/") + "/" + encodeNPMName(dep.Name)
+	res, err := c.get(ctx, endpoint)
+	if err != nil {
+		return ""
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return ""
+	}
+	var parsed struct {
+		Time map[string]string `json:"time"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return ""
+	}
+	return day(parsed.Time[dep.Version])
+}
+
+func (c *NPM) depsDevRelease(ctx context.Context, dep ecosystem.Dependency) string {
+	endpoint := strings.TrimRight(c.DepsDev, "/") + "/v3/systems/npm/packages/" + url.PathEscape(dep.Name) + "/versions/" + url.PathEscape(dep.Version)
+	res, err := c.get(ctx, endpoint)
+	if err != nil {
+		return ""
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return ""
+	}
+	var parsed struct {
+		PublishedAt string `json:"publishedAt"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return ""
+	}
+	return day(parsed.PublishedAt)
+}
+
+func (c *NPM) publicHost(registry string) bool {
+	u, err := url.Parse(registry)
+	if err != nil {
+		return false
+	}
+	hosts := c.PublicHosts
+	if len(hosts) == 0 {
+		hosts = []string{"registry.npmjs.org", "registry.yarnpkg.com"}
+	}
+	for _, h := range hosts {
+		if strings.EqualFold(u.Host, h) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *NPM) scanTarball(ctx context.Context, dep ecosystem.Dependency, tarball string, findings *capability.Findings) error {
+	if dep.Digest == "" {
+		return fmt.Errorf("missing lockfile digest for %s@%s", dep.Name, dep.Version)
+	}
+
+	registry := c.registryFor(dep)
+	u, err := url.Parse(tarball)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return fmt.Errorf("unsupported tarball scheme %q", u.Scheme)
+	}
+	reg, err := url.Parse(registry)
+	if err != nil {
+		return err
+	}
+	if !sameRegistryHost(reg.Host, u.Host) {
+		return fmt.Errorf("tarball host %q outside registry %q", u.Host, reg.Host)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tarball, nil)
+	if err != nil {
+		return err
+	}
+	if c.UserAgent != "" {
+		req.Header.Set("User-Agent", c.UserAgent)
+	}
+	httpClient := c.HTTP
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	client := *httpClient
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return fmt.Errorf("too many redirects")
+		}
+		if req.URL == nil || !sameRegistryHost(reg.Host, req.URL.Host) {
+			return fmt.Errorf("refusing cross-registry tarball redirect")
+		}
+		return nil
+	}
+	// Tarballs exceed the httpx body cache limit; fetch directly.
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return io.ErrUnexpectedEOF
+	}
+
+	raw, err := io.ReadAll(io.LimitReader(res.Body, maxTarballBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(raw) > maxTarballBytes {
+		return fmt.Errorf("tarball exceeds %d byte limit", maxTarballBytes)
+	}
+	if err := core.MatchDigest(dep.Digest, raw); err != nil {
+		return err
+	}
+	return capability.ScanSource(bytes.NewReader(raw), findings)
+}
+
+func sameRegistryHost(registryHost, targetHost string) bool {
+	registryHost = strings.ToLower(registryHost)
+	targetHost = strings.ToLower(targetHost)
+	if registryHost == targetHost {
+		return true
+	}
+	// Allow CDN hosts under the same organizational domain suffix when present.
+	if strings.HasSuffix(targetHost, "."+registryHost) {
+		return true
+	}
+	return false
+}
+
+func (c *NPM) attestations(ctx context.Context, dep ecosystem.Dependency) (lockfile.EvidenceState, lockfile.ChainEvidence) {
+	endpoint := strings.TrimRight(c.registryFor(dep), "/") + npmAttestationsPath + url.PathEscape(dep.Name) + "@" + url.PathEscape(dep.Version)
+	res, err := c.get(ctx, endpoint)
+	if err != nil {
+		return lockfile.EvidenceUnknown, lockfile.ChainEvidence{State: lockfile.EvidenceUnknown}
+	}
+	defer res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusNotFound:
+		return lockfile.EvidenceMissing, lockfile.ChainEvidence{State: lockfile.EvidenceMissing}
+	case http.StatusOK:
+	default:
+		return lockfile.EvidenceUnknown, lockfile.ChainEvidence{State: lockfile.EvidenceUnknown}
+	}
+
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 2<<20))
+	if err != nil {
+		return lockfile.EvidenceUnknown, lockfile.ChainEvidence{State: lockfile.EvidenceUnknown}
+	}
+	return extractChainVerified(raw, dep.Digest)
+}
+
+func (c *NPM) registryFor(dep ecosystem.Dependency) string {
+	if dep.Registry != "" {
+		return dep.Registry
+	}
+	if c.Registry != "" {
+		return c.Registry
+	}
+	return "https://registry.npmjs.org"
+}
+
+func (c *NPM) get(ctx context.Context, endpoint string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.UserAgent != "" {
+		req.Header.Set("User-Agent", c.UserAgent)
+	}
+	httpClient := c.HTTP
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	return httpx.Do(ctx, httpClient, req)
+}
+
+type npmVersionDoc struct {
+	HasInstallScript     bool              `json:"hasInstallScript"`
+	Scripts              map[string]string `json:"scripts"`
+	Gypfile              bool              `json:"gypfile"`
+	Binary               json.RawMessage   `json:"binary"`
+	Dependencies         map[string]string `json:"dependencies"`
+	OptionalDependencies map[string]string `json:"optionalDependencies"`
+	BundleDependencies   softStringList    `json:"bundleDependencies"`
+	Files                []string          `json:"files"`
+	Maintainers          []npmPerson       `json:"maintainers"`
+	Author               softPerson        `json:"author"`
+	NPMUser              *npmPerson        `json:"_npmUser"`
+	Deprecated           json.RawMessage   `json:"deprecated"`
+	License              json.RawMessage   `json:"license"`
+	Dist                 struct {
+		Signatures []npmSignature `json:"signatures"`
+		Integrity  string         `json:"integrity"`
+		Tarball    string         `json:"tarball"`
+	} `json:"dist"`
+}
+
+type npmPerson struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+type softPerson struct {
+	Person *npmPerson
+}
+
+func (p *softPerson) UnmarshalJSON(raw []byte) error {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	if raw[0] == '"' {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return err
+		}
+		name, email := splitPerson(s)
+		p.Person = &npmPerson{Name: name, Email: email}
+		return nil
+	}
+	var person npmPerson
+	if err := json.Unmarshal(raw, &person); err != nil {
+		return err
+	}
+	p.Person = &person
+	return nil
+}
+
+type softStringList []string
+
+func (s *softStringList) UnmarshalJSON(raw []byte) error {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	if raw[0] == '[' {
+		var list []string
+		if err := json.Unmarshal(raw, &list); err != nil {
+			return err
+		}
+		*s = list
+		return nil
+	}
+	// npm may set bundleDependencies to true/false.
+	return nil
+}
+
+func splitPerson(s string) (name, email string) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", ""
+	}
+	if i := strings.Index(s, "<"); i >= 0 {
+		j := strings.Index(s[i:], ">")
+		if j > 1 {
+			email = strings.TrimSpace(s[i+1 : i+j])
+			name = strings.TrimSpace(s[:i])
+			return name, email
+		}
+	}
+	if strings.Contains(s, "@") && !strings.Contains(s, " ") {
+		return "", s
+	}
+	return s, ""
+}
+
+func identityName(name, email string) string {
+	name = strings.TrimSpace(name)
+	email = strings.TrimSpace(email)
+	switch {
+	case name != "" && email != "":
+		return name + " <" + email + ">"
+	case name != "":
+		return name
+	case email != "":
+		return email
+	default:
+		return ""
+	}
+}
+
+func encodeNPMName(name string) string {
+	if i := strings.Index(name, "/"); i > 0 {
+		return name[:i] + "%2F" + name[i+1:]
+	}
+	return name
+}
+
+func isProvenance(predicateType string) bool {
+	switch strings.TrimSpace(predicateType) {
+	case "https://slsa.dev/provenance/v1",
+		"https://slsa.dev/provenance/v0.2",
+		"https://slsa.dev/provenance/v0.1":
+		return true
+	default:
+		return false
+	}
+}

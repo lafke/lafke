@@ -1,0 +1,187 @@
+package policy
+
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
+
+var (
+	changeActions = []ChangeAction{"", ActionAllow, ActionWarn, ActionReview, ActionDeny}
+	capNames      = []string{"network", "filesystem", "environment", "shell", "native_code", "install_scripts"}
+	fsMaximums    = []string{"", "none", "read", "write"}
+
+	// ScorecardChecks are the checks OpenSSF Scorecard runs, for validating a policy that
+	// refers to them. A misspelled name would otherwise never match and silently turn the
+	// rule off.
+	ScorecardChecks = []string{
+		"Binary-Artifacts", "Branch-Protection", "CI-Tests", "CII-Best-Practices", "Code-Review",
+		"Contributors", "Dangerous-Workflow", "Dependency-Update-Tool", "Fuzzing", "License",
+		"Maintained", "Packaging", "Pinned-Dependencies", "SAST", "Security-Policy",
+		"Signed-Releases", "Token-Permissions", "Vulnerabilities", "Webhooks",
+	}
+)
+
+func Validate(doc Document) error {
+	if doc.Version != SchemaVersion {
+		return fmt.Errorf("unsupported policy version %d", doc.Version)
+	}
+	switch doc.Network.ResolvedMode() {
+	case ModePublicOnly, ModeOffline, ModeAllowAll:
+	default:
+		return fmt.Errorf("unknown network mode %q", doc.Network.Mode)
+	}
+	if err := validateEvidenceRule("provenance", doc.Rules.Provenance); err != nil {
+		return err
+	}
+	if err := validateEvidenceRule("signature", doc.Rules.Signature); err != nil {
+		return err
+	}
+	if doc.Rules.Signature.OriginConfigured() {
+		return fmt.Errorf("signature policy does not support provenance origin allowlists")
+	}
+	switch doc.Rules.Vulnerabilities.Allow {
+	case "", "none":
+	default:
+		return fmt.Errorf("unknown vulnerabilities allow %q", doc.Rules.Vulnerabilities.Allow)
+	}
+	switch doc.Rules.Malicious.Allow {
+	case "", "none":
+	default:
+		return fmt.Errorf("unknown malicious allow %q", doc.Rules.Malicious.Allow)
+	}
+	if err := validateCapabilityRule(doc.Rules.Capabilities); err != nil {
+		return err
+	}
+	if err := validateOwnershipRule(doc.Rules.Ownership); err != nil {
+		return err
+	}
+	if err := validateHealthRule(doc.Rules.Health); err != nil {
+		return err
+	}
+	if err := validateLicenseRule(doc.Rules.Licenses); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateLicenseRule(rule LicenseRule) error {
+	switch rule.Unchecked {
+	case "", "unknown", "allow":
+	default:
+		return fmt.Errorf("unknown licenses unchecked action %q: use unknown or allow", rule.Unchecked)
+	}
+	for _, pair := range []struct {
+		name    string
+		entries []string
+	}{{"allow", rule.Allow}, {"deny", rule.Deny}} {
+		for _, entry := range pair.entries {
+			entry = strings.TrimSpace(entry)
+			switch {
+			case entry == "":
+				return fmt.Errorf("licenses %s entry must not be empty", pair.name)
+			case strings.ContainsAny(entry, " \t()"):
+				return fmt.Errorf("licenses %s entry %q must be one SPDX identifier, not an expression", pair.name, entry)
+			case strings.Contains(strings.TrimSuffix(entry, "*"), "*"):
+				return fmt.Errorf("licenses %s entry %q: * is only allowed at the end", pair.name, entry)
+			}
+		}
+	}
+	return nil
+}
+
+func validateHealthRule(rule HealthRule) error {
+	if _, err := ParseAge(rule.MinReleaseAge); err != nil {
+		return fmt.Errorf("health min_release_age %w", err)
+	}
+	for _, entry := range rule.InternalNames {
+		eco, name, ok := strings.Cut(entry, ":")
+		if !ok || eco == "" || eco != strings.TrimSpace(eco) || strings.TrimSpace(strings.TrimSuffix(name, "*")) == "" {
+			return fmt.Errorf("health internal_names entry %q: use <ecosystem>:<name>, such as npm:@acme/*", entry)
+		}
+		if strings.Contains(strings.TrimSuffix(name, "*"), "*") {
+			return fmt.Errorf("health internal_names entry %q: * is only allowed at the end", entry)
+		}
+	}
+	for name, min := range rule.ScorecardChecks {
+		if !slices.Contains(ScorecardChecks, name) {
+			return fmt.Errorf("health scorecard_checks: unknown check %q (checks are named like Dangerous-Workflow)", name)
+		}
+		if min < 0 || min > 10 {
+			return fmt.Errorf("health scorecard_checks %s: %v is not a score from 0 to 10", name, min)
+		}
+	}
+	for _, name := range rule.TyposquatAllow {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("health typosquat_allow entry must not be empty")
+		}
+	}
+	for _, pair := range []struct{ name, value string }{
+		{"deprecated", rule.Deprecated},
+		{"typosquat", rule.Typosquat},
+	} {
+		switch pair.value {
+		case "", "allow", "deny":
+		default:
+			return fmt.Errorf("unknown health %s action %q: use allow or deny", pair.name, pair.value)
+		}
+	}
+	return nil
+}
+
+func validateEvidenceRule(name string, rule EvidenceRule) error {
+	switch rule.Minimum {
+	case "", "present", "verified":
+	default:
+		return fmt.Errorf("unknown %s minimum %q", name, rule.Minimum)
+	}
+	for _, pair := range []struct {
+		field string
+		vals  []string
+	}{
+		{"allow_sources", rule.AllowSources},
+		{"allow_builders", rule.AllowBuilders},
+		{"allow_workflows", rule.AllowWorkflows},
+		{"allow_refs", rule.AllowRefs},
+		{"allow_predicate_types", rule.AllowPredicateTypes},
+	} {
+		for _, v := range pair.vals {
+			if strings.TrimSpace(v) == "" {
+				return fmt.Errorf("%s %s entry must not be empty", name, pair.field)
+			}
+		}
+	}
+	return nil
+}
+
+func validateCapabilityRule(rule CapabilityRule) error {
+	for _, name := range rule.Deny {
+		if !slices.Contains(capNames, name) {
+			return fmt.Errorf("unknown capability deny %q", name)
+		}
+	}
+	if !slices.Contains(fsMaximums, rule.Filesystem.Maximum) {
+		return fmt.Errorf("unknown filesystem maximum %q", rule.Filesystem.Maximum)
+	}
+	return nil
+}
+
+func validateOwnershipRule(rule OwnershipRule) error {
+	for _, pair := range []struct {
+		name   string
+		action ChangeAction
+	}{
+		{"publisher_change", rule.PublisherChange},
+		{"maintainer_added", rule.MaintainerAdded},
+		{"maintainer_removed", rule.MaintainerRemoved},
+	} {
+		if !slices.Contains(changeActions, pair.action) {
+			return fmt.Errorf("unknown ownership %s action %q", pair.name, pair.action)
+		}
+	}
+	return nil
+}
+
+func ValidMode(mode Mode) bool {
+	return slices.Contains([]Mode{ModePublicOnly, ModeOffline, ModeAllowAll}, mode)
+}

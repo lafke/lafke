@@ -1,0 +1,381 @@
+package pdm
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/cli/internal/network"
+	"github.com/pelletier/go-toml/v2"
+)
+
+const lockfileName = "pdm.lock"
+
+const defaultIndex = "https://pypi.org/simple"
+
+type Ecosystem struct{}
+
+func New() Ecosystem {
+	return Ecosystem{}
+}
+
+func (Ecosystem) Name() string { return "pdm" }
+
+func (Ecosystem) OSVEcosystem() string { return "PyPI" }
+
+func (Ecosystem) Detect(path string) bool {
+	return core.FileExists(core.Join(path, lockfileName))
+}
+
+func (Ecosystem) Dependencies(path string) ([]core.Dependency, error) {
+	raw, err := core.ReadFile(core.Join(path, lockfileName))
+	if err != nil {
+		return nil, err
+	}
+
+	var lock pdmLock
+	if err := toml.Unmarshal(raw, &lock); err != nil {
+		return nil, err
+	}
+
+	sources := configuredSources(path)
+	var deps []core.Dependency
+	for _, pkg := range lock.Package {
+		if pkg.Name == "" || pkg.Version == "" {
+			continue
+		}
+		kind, registry := classify(pkg, sources)
+		for _, file := range files(pkg) {
+			dep := core.Dependency{
+				Ecosystem:  "pypi",
+				Resolver:   "pdm",
+				Registry:   registry,
+				SourceKind: kind,
+				Name:       pkg.Name,
+				Version:    pkg.Version,
+				Filename:   file.Name,
+				Digest:     core.NormalizeDigest(file.Hash),
+			}
+			switch kind {
+			case core.SourceGit:
+				dep.Artifact = core.RemoteLocation(pkg.Git)
+				dep.Resolved = pkg.Revision
+			case core.SourceURL:
+				dep.Artifact = core.RemoteLocation(pkg.URL)
+			}
+			deps = append(deps, dep)
+		}
+	}
+	core.ApplyPackageGraph(deps, packageKey, lock.graph(path))
+	return deps, nil
+}
+
+func packageKey(dep core.Dependency) string {
+	return core.NormalizePythonName(dep.Name) + "@" + dep.Version
+}
+
+type pdmLock struct {
+	Package []pdmPackage `toml:"package"`
+}
+
+type pdmPackage struct {
+	Name     string    `toml:"name"`
+	Version  string    `toml:"version"`
+	Path     string    `toml:"path"`
+	URL      string    `toml:"url"`
+	Git      string    `toml:"git"`
+	Revision string    `toml:"revision"`
+	Files    []pdmFile `toml:"files"`
+
+	// Groups lists the dependency groups that need the package: "default", an extra, or a
+	// development group. Dependencies are requirement strings, present when the lock was
+	// written with metadata.
+	Groups       []string `toml:"groups"`
+	Dependencies []string `toml:"dependencies"`
+}
+
+type pdmFile struct {
+	File string `toml:"file"`
+	URL  string `toml:"url"`
+	Hash string `toml:"hash"`
+}
+
+type hashedFile struct {
+	Name string
+	Hash string
+}
+
+func files(pkg pdmPackage) []hashedFile {
+	var out []hashedFile
+	for _, file := range pkg.Files {
+		if file.Hash == "" && file.File == "" {
+			continue
+		}
+		out = append(out, hashedFile{Name: file.File, Hash: file.Hash})
+	}
+	if len(out) == 0 {
+		return []hashedFile{{}}
+	}
+	return out
+}
+
+func classify(pkg pdmPackage, sources []string) (kind, registry string) {
+	switch {
+	case pkg.Path != "":
+		return core.SourceFile, ""
+	case pkg.Git != "":
+		return core.SourceGit, ""
+	case pkg.URL != "":
+		return core.SourceURL, ""
+	default:
+		return core.SourceRegistry, registryOf(pkg, sources)
+	}
+}
+
+func registryOf(pkg pdmPackage, sources []string) string {
+	var urls []string
+	unlocated := len(pkg.Files) == 0
+	for _, file := range pkg.Files {
+		if file.URL == "" {
+			unlocated = true
+			continue
+		}
+		urls = append(urls, file.URL)
+	}
+	if unlocated {
+		// Files without a recorded URL could come from any configured index.
+		urls = append(urls, sources...)
+	}
+	return network.Provenance("pypi", urls)
+}
+
+func configuredSources(project string) []string {
+	cfg := loadPDMConfig(project)
+	var urls []string
+	namedPypi := false
+	for _, src := range cfg.sources {
+		if strings.EqualFold(src.name, "pypi") {
+			namedPypi = true
+			break
+		}
+	}
+	if !namedPypi {
+		pypi := cfg.pypiURL
+		if pypi == "" {
+			pypi = defaultIndex
+		}
+		urls = append(urls, pypi)
+	}
+	for _, src := range cfg.sources {
+		if src.url != "" {
+			urls = append(urls, src.url)
+		}
+	}
+	if !cfg.ignoreStored {
+		urls = append(urls, cfg.extra...)
+	}
+	return urls
+}
+
+type pdmSource struct {
+	name string
+	url  string
+}
+
+type pdmCfg struct {
+	pypiURL      string
+	ignoreStored bool
+	extra        []string
+	sources      []pdmSource
+}
+
+func loadPDMConfig(project string) pdmCfg {
+	cfg := pdmCfg{}
+	for _, path := range siteConfigFiles() {
+		applyConfigFile(&cfg, path)
+	}
+	for _, path := range userConfigFiles() {
+		applyConfigFile(&cfg, path)
+	}
+	for _, dir := range dirsFromRoot(project) {
+		applyConfigFile(&cfg, filepath.Join(dir, "pdm.toml"))
+		cfg.sources = append(cfg.sources, pyprojectSources(filepath.Join(dir, "pyproject.toml"))...)
+	}
+	if v := strings.TrimSpace(os.Getenv("PDM_PYPI_URL")); v != "" {
+		cfg.pypiURL = v
+	}
+	return cfg
+}
+
+func siteConfigFiles() []string {
+	var paths []string
+	if dirs := os.Getenv("XDG_CONFIG_DIRS"); dirs != "" {
+		for _, dir := range strings.Split(dirs, ":") {
+			if dir == "" {
+				continue
+			}
+			paths = append(paths, filepath.Join(dir, "pdm", "config.toml"))
+		}
+	}
+	if prog := os.Getenv("ProgramData"); prog != "" {
+		paths = append(paths, filepath.Join(prog, "pdm", "pdm", "config.toml"))
+	}
+	return append(paths,
+		"/etc/xdg/pdm/config.toml",
+		"/Library/Application Support/pdm/config.toml",
+	)
+}
+
+func userConfigFiles() []string {
+	var paths []string
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		paths = append(paths, filepath.Join(xdg, "pdm", "config.toml"))
+	}
+	if local := os.Getenv("LOCALAPPDATA"); local != "" {
+		paths = append(paths, filepath.Join(local, "pdm", "pdm", "config.toml"))
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return paths
+	}
+	return append(paths,
+		filepath.Join(home, ".config", "pdm", "config.toml"),
+		filepath.Join(home, "Library", "Application Support", "pdm", "config.toml"),
+		filepath.Join(home, "AppData", "Local", "pdm", "pdm", "config.toml"),
+	)
+}
+
+func dirsFromRoot(project string) []string {
+	abs, err := filepath.Abs(project)
+	if err != nil {
+		abs = project
+	}
+	var fromLeaf []string
+	dir := abs
+	for i := 0; i < 64; i++ {
+		fromLeaf = append(fromLeaf, dir)
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	out := make([]string, len(fromLeaf))
+	for i := range fromLeaf {
+		out[i] = fromLeaf[len(fromLeaf)-1-i]
+	}
+	return out
+}
+
+func applyConfigFile(cfg *pdmCfg, path string) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var parsed map[string]any
+	if toml.Unmarshal(raw, &parsed) != nil {
+		return
+	}
+	pypi, _ := parsed["pypi"].(map[string]any)
+	if pypi == nil {
+		return
+	}
+	if url := stringValue(pypi["url"]); url != "" {
+		cfg.pypiURL = url
+	}
+	if ignore, ok := boolValue(pypi["ignore_stored_index"]); ok {
+		cfg.ignoreStored = ignore
+	}
+	for name, value := range pypi {
+		if name == "url" || name == "verify_ssl" || name == "username" || name == "password" || name == "ca_certs" || name == "client_cert" || name == "client_key" || name == "json_api" || name == "ignore_stored_index" {
+			continue
+		}
+		sub, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		if url := stringValue(sub["url"]); url != "" {
+			cfg.extra = append(cfg.extra, url)
+		}
+	}
+}
+
+func pyprojectSources(path string) []pdmSource {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var parsed struct {
+		Tool struct {
+			PDM struct {
+				Source []struct {
+					Name string `toml:"name"`
+					URL  string `toml:"url"`
+				} `toml:"source"`
+			} `toml:"pdm"`
+		} `toml:"tool"`
+	}
+	if toml.Unmarshal(raw, &parsed) != nil {
+		return nil
+	}
+	var out []pdmSource
+	for _, src := range parsed.Tool.PDM.Source {
+		url := strings.TrimSpace(src.URL)
+		if url == "" {
+			continue
+		}
+		out = append(out, pdmSource{name: strings.TrimSpace(src.Name), url: url})
+	}
+	return out
+}
+
+func stringValue(v any) string {
+	s, _ := v.(string)
+	return strings.TrimSpace(s)
+}
+
+func boolValue(v any) (bool, bool) {
+	b, ok := v.(bool)
+	return b, ok
+}
+
+// graph reads edges from the requirement strings and scopes from the groups. pdm's group
+// names are the project's own, so pyproject.toml says which are extras and which are
+// development; without it only "default" is understood.
+func (l pdmLock) graph(project string) core.PackageGraph {
+	g := core.PackageGraph{
+		Edges: map[string][]string{},
+		Fixed: map[string]string{},
+	}
+	byName := map[string][]string{}
+	for _, pkg := range l.Package {
+		if pkg.Name != "" && pkg.Version != "" {
+			name := core.NormalizePythonName(pkg.Name)
+			byName[name] = append(byName[name], name+"@"+pkg.Version)
+		}
+	}
+
+	kinds := groupScopes(project)
+	for _, pkg := range l.Package {
+		if pkg.Name == "" || pkg.Version == "" {
+			continue
+		}
+		key := core.NormalizePythonName(pkg.Name) + "@" + pkg.Version
+		for _, req := range pkg.Dependencies {
+			g.Edges[key] = append(g.Edges[key], byName[core.PythonRequirementName(req)]...)
+		}
+		scope := ""
+		for _, group := range pkg.Groups {
+			if group == "default" {
+				scope = core.MergeScope(scope, core.ScopeRuntime)
+			} else {
+				scope = core.MergeScope(scope, kinds[group])
+			}
+		}
+		if scope != "" {
+			g.Fixed[key] = scope
+		}
+	}
+	return g
+}

@@ -1,0 +1,30 @@
+package evidence_test
+
+import (
+	"testing"
+
+	"github.com/lafke/cli/internal/ecosystem"
+	"github.com/lafke/cli/internal/evidence"
+)
+
+func TestKeyIncludesFilename(t *testing.T) {
+	got := evidence.Key(ecosystem.Dependency{
+		Ecosystem: "pypi",
+		Name:      "foo",
+		Version:   "1.0.0",
+		Filename:  "foo-linux.whl",
+	})
+	if got != "pypi:foo@1.0.0#foo-linux.whl" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestKeyOmitsEmptyURLVersion(t *testing.T) {
+	got := evidence.Key(ecosystem.Dependency{
+		Ecosystem: "url",
+		Name:      "https://esm.sh/preact",
+	})
+	if got != "url:https://esm.sh/preact" {
+		t.Fatalf("got %q", got)
+	}
+}
