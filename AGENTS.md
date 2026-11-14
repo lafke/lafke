@@ -28,6 +28,11 @@ speak a versioned JSON protocol; see `ProtocolVersion` in `internal/engine/engin
 - `pkg/lockfile`, `pkg/policy`, `pkg/exceptions`: public types and validation.
 - `schemas/`: JSON schemas, embedded and used to validate command output.
 - `docs/`, `examples/`, `action/` + `action.yml`, `scripts/install.sh`.
+- `scripts/package.sh <goos> <goarch> <version>`: builds the CLI and the engine and writes
+  `lafke_<os>_<arch>.tar.gz` (`.zip` on Windows). `.github/workflows/build.yml` runs it
+  for every platform; `release.yml` runs it at a `v*` tag, attests provenance and publishes
+  the release. Both check the engine out into `engine/`. A release tag must exist with the
+  same name in this repository and in `lafke/engine`.
 
 ## Commands
 
