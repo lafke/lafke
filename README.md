@@ -1,4 +1,4 @@
-# Lafke CLI
+# Lafke
 
 Lafke records the trust decision for each dependency in `lafke.lock`, fails CI
 when that state drifts, and analyzes your own source code for vulnerabilities, committed
