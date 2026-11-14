@@ -1,7 +1,9 @@
 name: Release
 
-# Builds the CLI and the engine for every platform and publishes the archives as a
-# release of this repository.
+# Builds the CLI and the engine for every platform. The release is created as a draft with
+# every asset attached, then published only after all attestations have succeeded, so
+# /releases/latest never points at an unattested release. Immutable releases need the
+# assets in place before publish.
 on:
   push:
     tags:
@@ -76,13 +78,11 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-  publish:
+  draft:
     needs: [package, sbom]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
-      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -95,6 +95,46 @@ jobs:
       - name: Checksums
         working-directory: dist
         run: sha256sum lafke* > checksums.txt
+      - name: Release notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)
+          {
+            echo "## Changelog"
+            git log --no-merges --format='* %H %s' "${prev:+${prev}..}${TAG}" \
+              | grep -Ev '^\* [0-9a-f]+ (docs|test|chore):' | LC_ALL=C sort -k3
+            echo
+          } > notes.md
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --notes-file notes.md \
+            --verify-tag \
+            --draft
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-dist
+          path: dist/*
+          if-no-files-found: error
+
+  attest:
+    needs: draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-dist
+          path: dist
       - name: Extract binaries
         run: |
           for a in dist/*.tar.gz; do
@@ -115,27 +155,29 @@ jobs:
             bin/*/lafke-engine
             bin/*/lafke.exe
             bin/*/lafke-engine.exe
-      - name: Release notes
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          prev=$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)
-          {
-            echo "## Changelog"
-            git log --no-merges --format='* %H %s' "${prev:+${prev}..}${TAG}" \
-              | grep -Ev '^\* [0-9a-f]+ (docs|test|chore):' | LC_ALL=C sort -k3
-            echo
-          } > notes.md
-      - name: Publish release
+      - name: Attest CLI SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            bin/*/lafke
+            bin/*/lafke.exe
+          sbom-path: dist/lafke.spdx.json
+      - name: Attest engine SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            bin/*/lafke-engine
+            bin/*/lafke-engine.exe
+          sbom-path: dist/lafke-engine.spdx.json
+
+  publish:
+    needs: [draft, attest]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish draft release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          gh release create "$TAG" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$TAG" \
-            --notes-file notes.md \
-            --verify-tag \
-            --draft
-          # Immutable releases lock assets at publish, so everything is attached to the draft first.
-          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false
