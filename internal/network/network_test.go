@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/network"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/network"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 func TestAllowPublicOnly(t *testing.T) {

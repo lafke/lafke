@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lafke/cli/internal/explain"
-	"github.com/lafke/cli/internal/policy"
-	"github.com/lafke/cli/internal/scanner"
+	"github.com/lafke/lafke/internal/explain"
+	"github.com/lafke/lafke/internal/policy"
+	"github.com/lafke/lafke/internal/scanner"
 	"github.com/spf13/cobra"
 )
 

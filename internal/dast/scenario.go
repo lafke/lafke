@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 type Scenario struct {

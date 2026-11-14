@@ -9,7 +9,7 @@ package reachability
 import (
 	"sort"
 
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // Annotate sets Reachable and Via on every checked vulnerability in the document.

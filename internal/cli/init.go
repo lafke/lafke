@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/lock"
-	"github.com/lafke/cli/internal/policy"
-	"github.com/lafke/cli/internal/scanner"
-	pkgpolicy "github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/lock"
+	"github.com/lafke/lafke/internal/policy"
+	"github.com/lafke/lafke/internal/scanner"
+	pkgpolicy "github.com/lafke/lafke/pkg/policy"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/goenv"
+	"github.com/lafke/lafke/internal/goenv"
 )
 
 func isolate(t *testing.T) {

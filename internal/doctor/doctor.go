@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lafke/cli/internal/exceptions"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/lock"
-	"github.com/lafke/cli/internal/policy"
+	"github.com/lafke/lafke/internal/exceptions"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/lock"
+	"github.com/lafke/lafke/internal/policy"
 )
 
 type Options struct {

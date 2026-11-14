@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/cli"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/cli"
+	"github.com/lafke/lafke/schemas"
 )
 
 // updatedProject is a locked Deno project whose dependency then moves to a new version.

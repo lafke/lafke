@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/httpx"
+	"github.com/lafke/lafke/internal/httpx"
 )
 
 // isolate points the cache at a fresh directory and restores the default settings after.

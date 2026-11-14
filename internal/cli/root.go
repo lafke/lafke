@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lafke/cli/internal/httpx"
-	"github.com/lafke/cli/internal/lock"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/httpx"
+	"github.com/lafke/lafke/internal/lock"
+	"github.com/lafke/lafke/pkg/policy"
 	"github.com/spf13/cobra"
 )
 

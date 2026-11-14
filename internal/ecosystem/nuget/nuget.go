@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/network"
-	"github.com/lafke/cli/internal/nugetconfig"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/network"
+	"github.com/lafke/lafke/internal/nugetconfig"
 )
 
 const lockfileName = "packages.lock.json"

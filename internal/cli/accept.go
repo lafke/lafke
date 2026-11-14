@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lafke/cli/internal/exceptions"
-	pkgexceptions "github.com/lafke/cli/pkg/exceptions"
+	"github.com/lafke/lafke/internal/exceptions"
+	pkgexceptions "github.com/lafke/lafke/pkg/exceptions"
 	"github.com/spf13/cobra"
 )
 

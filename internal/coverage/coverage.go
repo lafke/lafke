@@ -1,7 +1,7 @@
 package coverage
 
 import (
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 	"net/url"
 	"slices"
 	"strings"

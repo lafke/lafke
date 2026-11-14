@@ -3,8 +3,8 @@ package osv_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/osv"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/osv"
 )
 
 func TestEcosystem(t *testing.T) {

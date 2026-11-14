@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 func TestHealthRuleValidation(t *testing.T) {

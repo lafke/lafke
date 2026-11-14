@@ -2,15 +2,15 @@ package cli_test
 
 import (
 	"encoding/json"
-	"github.com/lafke/cli/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/engine/enginetest"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/schemas"
 )
 
 const cspmSnapshot = `{"configurationItems":[{"resourceType":"AWS::RDS::DBInstance","resourceId":"db-1","accountId":"123456789012","awsRegion":"ap-northeast-1","configuration":{"publiclyAccessible":true,"storageEncrypted":true,"backupRetentionPeriod":7}}]}`

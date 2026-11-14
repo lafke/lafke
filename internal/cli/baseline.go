@@ -2,8 +2,8 @@ package cli
 
 import (
 	"fmt"
-	"github.com/lafke/cli/internal/baseline"
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/baseline"
+	"github.com/lafke/lafke/internal/finding"
 	"github.com/spf13/cobra"
 	"os"
 )

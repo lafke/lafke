@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/cspm"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/cspm"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/schemas"
 )
 
 func snapshot(typ string, config any, supplementary any) string {

@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lafke/cli/internal/decode"
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/decode"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/pkg/lockfile"
 	"gopkg.in/yaml.v3"
 )
 

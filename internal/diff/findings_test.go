@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/diff"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/diff"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func art(name, version, digest string, status lockfile.Status) lockfile.Artifact {

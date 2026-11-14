@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/renv"
+	"github.com/lafke/lafke/internal/ecosystem/renv"
 )
 
 func FuzzDependencies(f *testing.F) {

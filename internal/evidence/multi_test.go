@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/evidence"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/evidence"
 )
 
 // gateCollector returns only once the other collector has started, so collectors that

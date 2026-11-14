@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/exceptions"
+	"github.com/lafke/lafke/internal/exceptions"
 )
 
 func FuzzLoad(f *testing.F) {

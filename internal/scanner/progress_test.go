@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/lafke/cli/internal/progress"
-	"github.com/lafke/cli/internal/scanner"
+	"github.com/lafke/lafke/internal/progress"
+	"github.com/lafke/lafke/internal/scanner"
 )
 
 func TestScanProgressPreservesResults(t *testing.T) {

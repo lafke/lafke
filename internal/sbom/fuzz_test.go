@@ -3,7 +3,7 @@ package sbom_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/sbom"
+	"github.com/lafke/lafke/internal/sbom"
 )
 
 func FuzzParse(f *testing.F) {

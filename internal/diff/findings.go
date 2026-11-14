@@ -3,7 +3,7 @@ package diff
 import (
 	"strings"
 
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 // Findings turns trust drift into findings so it can be written in any report format.

@@ -1,8 +1,8 @@
 package baseline_test
 
 import (
-	"github.com/lafke/cli/internal/baseline"
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/baseline"
+	"github.com/lafke/lafke/internal/finding"
 	"testing"
 )
 

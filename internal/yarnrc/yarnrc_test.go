@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/yarnrc"
+	"github.com/lafke/lafke/internal/yarnrc"
 )
 
 func isolate(t *testing.T) {

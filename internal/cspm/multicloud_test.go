@@ -1,7 +1,7 @@
 package cspm_test
 
 import (
-	"github.com/lafke/cli/internal/cspm"
+	"github.com/lafke/lafke/internal/cspm"
 	"testing"
 )
 

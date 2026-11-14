@@ -3,7 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/prioritization"
+	"github.com/lafke/lafke/internal/prioritization"
 	"github.com/spf13/cobra"
 	"os"
 )

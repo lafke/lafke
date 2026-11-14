@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/lafke/cli/internal/ecosystem"
+	"github.com/lafke/lafke/internal/ecosystem"
 )
 
 // Multi fans out Collect across collectors and merges records by key.

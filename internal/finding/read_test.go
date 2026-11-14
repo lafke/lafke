@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 func TestReadSARIFSeverity(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 type junitDoc struct {

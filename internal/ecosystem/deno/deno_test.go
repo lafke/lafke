@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/ecosystem/deno"
-	"github.com/lafke/cli/internal/npmrc"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/deno"
+	"github.com/lafke/lafke/internal/npmrc"
 )
 
 func isolate(t *testing.T) {

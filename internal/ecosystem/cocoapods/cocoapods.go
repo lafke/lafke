@@ -7,7 +7,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 const lockfileName = "Podfile.lock"

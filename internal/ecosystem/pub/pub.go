@@ -3,8 +3,8 @@ package pub
 import (
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/network"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/network"
 	"gopkg.in/yaml.v3"
 )
 

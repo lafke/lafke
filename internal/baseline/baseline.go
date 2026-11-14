@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 func Read(r io.Reader) (finding.Report, error) {

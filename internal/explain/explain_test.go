@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/explain"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/explain"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func TestExplainTrustedPackage(t *testing.T) {

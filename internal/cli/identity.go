@@ -3,7 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/identity"
+	"github.com/lafke/lafke/internal/identity"
 	"github.com/spf13/cobra"
 	"os"
 	"time"

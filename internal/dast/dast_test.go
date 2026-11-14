@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/dast"
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/dast"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 func ids(r finding.Report) map[string]bool {

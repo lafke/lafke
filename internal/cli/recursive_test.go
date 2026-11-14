@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/cli"
+	"github.com/lafke/lafke/internal/cli"
 )
 
 func monorepo(t *testing.T) string {

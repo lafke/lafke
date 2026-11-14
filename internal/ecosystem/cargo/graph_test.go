@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/cargo"
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/cargo"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 func crate(name, version string, deps ...string) string {

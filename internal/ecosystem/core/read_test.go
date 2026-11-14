@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 func TestReadFileLimit(t *testing.T) {

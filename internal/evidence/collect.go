@@ -3,8 +3,8 @@ package evidence
 import (
 	"context"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 type Record struct {

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/pkg/exceptions"
+	"github.com/lafke/lafke/pkg/exceptions"
 )
 
 func day(s string) time.Time {

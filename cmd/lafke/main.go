@@ -1,6 +1,6 @@
 package main
 
-import "github.com/lafke/cli/internal/cli"
+import "github.com/lafke/lafke/internal/cli"
 
 var (
 	version = "dev"

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/npmrc"
+	"github.com/lafke/lafke/internal/npmrc"
 )
 
 func isolate(t *testing.T) {

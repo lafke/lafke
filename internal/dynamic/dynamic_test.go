@@ -1,7 +1,7 @@
 package dynamic_test
 
 import (
-	"github.com/lafke/cli/internal/dynamic"
+	"github.com/lafke/lafke/internal/dynamic"
 	"strings"
 	"testing"
 )

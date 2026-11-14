@@ -2,8 +2,8 @@ package cli
 
 import (
 	"fmt"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/runrecord"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/runrecord"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"os"

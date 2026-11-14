@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/vex"
-	"github.com/lafke/cli/pkg/exceptions"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/vex"
+	"github.com/lafke/lafke/pkg/exceptions"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 var stamp = time.Date(2026, 6, 15, 9, 30, 0, 0, time.UTC)

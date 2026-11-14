@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/lafke/cli/internal/progress"
+	"github.com/lafke/lafke/internal/progress"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

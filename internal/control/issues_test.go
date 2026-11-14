@@ -2,9 +2,9 @@ package control_test
 
 import (
 	"encoding/json"
-	"github.com/lafke/cli/internal/control"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/runrecord"
+	"github.com/lafke/lafke/internal/control"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/runrecord"
 	"strings"
 	"testing"
 )

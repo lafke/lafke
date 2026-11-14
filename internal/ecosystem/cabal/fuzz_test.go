@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/cabal"
+	"github.com/lafke/lafke/internal/ecosystem/cabal"
 )
 
 func FuzzDependencies(f *testing.F) {

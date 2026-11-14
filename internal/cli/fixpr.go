@@ -3,8 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/external"
-	"github.com/lafke/cli/internal/remediation"
+	"github.com/lafke/lafke/internal/external"
+	"github.com/lafke/lafke/internal/remediation"
 	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"

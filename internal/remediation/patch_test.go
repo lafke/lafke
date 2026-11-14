@@ -1,10 +1,10 @@
 package remediation_test
 
 import (
-	"github.com/lafke/cli/internal/engine"
-	"github.com/lafke/cli/internal/engine/enginetest"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/remediation"
+	"github.com/lafke/lafke/internal/engine"
+	"github.com/lafke/lafke/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/remediation"
 	"os"
 	"path/filepath"
 	"strings"

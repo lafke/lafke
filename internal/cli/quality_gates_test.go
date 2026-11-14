@@ -2,13 +2,13 @@ package cli_test
 
 import (
 	"encoding/json"
-	"github.com/lafke/cli/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/engine/enginetest"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/quality"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/quality"
+	"github.com/lafke/lafke/schemas"
 )
 
 func TestQualityPerRuleOutputAndSchema(t *testing.T) {

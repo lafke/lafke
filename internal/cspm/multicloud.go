@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/external"
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/external"
+	"github.com/lafke/lafke/internal/finding"
 	"regexp"
 	"strings"
 )

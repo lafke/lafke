@@ -2,9 +2,9 @@ package cli
 
 import (
 	"fmt"
-	"github.com/lafke/cli/internal/exceptions"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/history"
+	"github.com/lafke/lafke/internal/exceptions"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/history"
 	"github.com/spf13/cobra"
 	"time"
 )

@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/external"
+	"github.com/lafke/lafke/internal/external"
 	"io/fs"
 	"os"
 	"path/filepath"

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 type Node struct {

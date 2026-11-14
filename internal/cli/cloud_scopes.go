@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/lafke/cli/internal/cspm"
-	"github.com/lafke/cli/internal/finding"
-	p "github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/cspm"
+	"github.com/lafke/lafke/internal/finding"
+	p "github.com/lafke/lafke/pkg/policy"
 	"github.com/spf13/cobra"
 	"strings"
 )

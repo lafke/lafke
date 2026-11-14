@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem"
+	"github.com/lafke/lafke/internal/ecosystem"
 )
 
 // skipped are directories that hold other people's code or build output. A lockfile in

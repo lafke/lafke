@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/chain"
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/chain"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 func taint(id, subject string, sev finding.Severity, src, sink string) finding.Finding {

@@ -2,10 +2,10 @@ package cli_test
 
 import (
 	"encoding/json"
-	"github.com/lafke/cli/internal/engine/enginetest"
-	"github.com/lafke/cli/internal/lifecycle"
-	"github.com/lafke/cli/internal/runrecord"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/lifecycle"
+	"github.com/lafke/lafke/internal/runrecord"
+	"github.com/lafke/lafke/schemas"
 	"os"
 	"path/filepath"
 	"testing"

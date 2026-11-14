@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/control"
-	"github.com/lafke/cli/internal/identity"
+	"github.com/lafke/lafke/internal/control"
+	"github.com/lafke/lafke/internal/identity"
 )
 
 func TestDatabaseMigrationIsolationEncryptionAndRecovery(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/lafke/cli/internal/httpx"
+	"github.com/lafke/lafke/internal/httpx"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

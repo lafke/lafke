@@ -6,8 +6,8 @@ import (
 	"compress/gzip"
 	"testing"
 
-	"github.com/lafke/cli/internal/capability"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/capability"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func TestFromMetadataInstallScript(t *testing.T) {

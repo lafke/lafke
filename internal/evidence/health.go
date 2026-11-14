@@ -6,8 +6,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/lafke/cli/internal/license"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/license"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // clip makes registry-supplied text safe to store: one line, bounded length.

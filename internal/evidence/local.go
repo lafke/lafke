@@ -12,9 +12,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 type DSSE struct {

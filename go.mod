@@ -1,4 +1,4 @@
-module github.com/lafke/cli
+module github.com/lafke/lafke
 
 go 1.26.0
 

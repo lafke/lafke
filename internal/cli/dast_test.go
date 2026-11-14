@@ -2,7 +2,7 @@ package cli_test
 
 import (
 	"encoding/json"
-	"github.com/lafke/cli/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/engine/enginetest"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/schemas"
 )
 
 func TestDASTOfflineAndPublicOnlyNeverContactTarget(t *testing.T) {

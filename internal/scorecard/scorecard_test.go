@@ -7,10 +7,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/lafke/cli/internal/httpx"
-	"github.com/lafke/cli/internal/scorecard"
-	"github.com/lafke/cli/pkg/lockfile"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/httpx"
+	"github.com/lafke/lafke/internal/scorecard"
+	"github.com/lafke/lafke/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 // server fakes the two deps.dev endpoints by the path it is asked for.

@@ -3,9 +3,9 @@ package scanner_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/scanner"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/scanner"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func TestFindingsSkipTrustedArtifacts(t *testing.T) {

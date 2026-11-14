@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/lafke/cli/internal/engine"
-	"github.com/lafke/cli/internal/exceptions"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/progress"
+	"github.com/lafke/lafke/internal/engine"
+	"github.com/lafke/lafke/internal/exceptions"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/progress"
 	"github.com/spf13/cobra"
 )
 

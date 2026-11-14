@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 // applyGraph records edges from the lockfile and scopes from the direct dependencies in

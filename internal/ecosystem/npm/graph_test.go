@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/ecosystem/npm"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/npm"
 )
 
 func loadLock(t *testing.T, body string) map[string]core.Dependency {

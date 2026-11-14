@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/trust"
-	"github.com/lafke/cli/pkg/lockfile"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/trust"
+	"github.com/lafke/lafke/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 func licensed(declared string) lockfile.Artifact {

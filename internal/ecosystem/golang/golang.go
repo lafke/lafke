@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/goenv"
-	"github.com/lafke/cli/internal/network"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/goenv"
+	"github.com/lafke/lafke/internal/network"
 	"golang.org/x/mod/modfile"
 )
 

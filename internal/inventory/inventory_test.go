@@ -3,8 +3,8 @@ package inventory_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/lafke/cli/internal/inventory"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/inventory"
+	"github.com/lafke/lafke/schemas"
 	"os"
 	"os/exec"
 	"path/filepath"

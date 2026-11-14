@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/cli"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/cli"
+	"github.com/lafke/lafke/schemas"
 )
 
 func runCLIErr(t *testing.T, args ...string) (string, error) {

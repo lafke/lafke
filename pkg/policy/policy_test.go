@@ -3,7 +3,7 @@ package policy_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 const defaultFingerprint = "sha256:a7b760ed4719640b3b9c63f1441e3fda7a2d511fec8f731edbd4ac280367e5c1"

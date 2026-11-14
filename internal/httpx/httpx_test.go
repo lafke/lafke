@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/httpx"
+	"github.com/lafke/lafke/internal/httpx"
 )
 
 func TestDoSameOriginRedirect(t *testing.T) {

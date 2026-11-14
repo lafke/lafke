@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 const lockfileName = "mix.lock"

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 // applyGraph records edges and scopes. Gemfile.lock lists the gems the Gemfile asks for under

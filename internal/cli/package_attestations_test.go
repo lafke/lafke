@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/pkg/lockfile"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/pkg/lockfile"
+	"github.com/lafke/lafke/schemas"
 )
 
 func TestOfflinePackageAttestationsAndSignerDrift(t *testing.T) {

@@ -1,8 +1,8 @@
 package coverage_test
 
 import (
-	"github.com/lafke/cli/internal/coverage"
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/coverage"
+	"github.com/lafke/lafke/internal/finding"
 	"testing"
 )
 

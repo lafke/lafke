@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/cli"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/cli"
+	"github.com/lafke/lafke/schemas"
 )
 
 func lockedDenoProject(t *testing.T) string {

@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/identity"
+	"github.com/lafke/lafke/internal/identity"
 	"net/http"
 	"strings"
 	"time"

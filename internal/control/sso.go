@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/identity"
+	"github.com/lafke/lafke/internal/identity"
 	"io"
 	"net"
 	"net/http"

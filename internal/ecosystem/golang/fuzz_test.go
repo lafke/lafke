@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/golang"
+	"github.com/lafke/lafke/internal/ecosystem/golang"
 )
 
 func FuzzDependencies(f *testing.F) {

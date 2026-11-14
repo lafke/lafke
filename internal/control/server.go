@@ -3,8 +3,8 @@ package control
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/identity"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/identity"
 	"io"
 	"net/http"
 	"slices"

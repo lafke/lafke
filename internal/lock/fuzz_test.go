@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/lock"
+	"github.com/lafke/lafke/internal/lock"
 )
 
 func FuzzRead(f *testing.F) {

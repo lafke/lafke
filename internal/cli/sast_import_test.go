@@ -2,13 +2,13 @@ package cli_test
 
 import (
 	"encoding/json"
-	"github.com/lafke/cli/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/engine/enginetest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/schemas"
 )
 
 func writeImportSARIF(t *testing.T, project string) string {

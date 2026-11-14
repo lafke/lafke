@@ -2,9 +2,9 @@ package protect_test
 
 import (
 	"context"
-	"github.com/lafke/cli/internal/control"
-	"github.com/lafke/cli/internal/engine/enginetest"
-	"github.com/lafke/cli/internal/protect"
+	"github.com/lafke/lafke/internal/control"
+	"github.com/lafke/lafke/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/protect"
 	"os"
 	"os/exec"
 	"path/filepath"

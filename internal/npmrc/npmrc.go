@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lafke/cli/internal/network"
+	"github.com/lafke/lafke/internal/network"
 )
 
 const DefaultRegistry = "https://registry.npmjs.org"

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/diff"
-	"github.com/lafke/cli/pkg/lockfile"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/diff"
+	"github.com/lafke/lafke/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 func TestCompareTrustDrift(t *testing.T) {

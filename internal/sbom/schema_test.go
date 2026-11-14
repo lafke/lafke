@@ -3,8 +3,8 @@ package sbom_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/sbom"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/sbom"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // The exports are checked against the official schemas, since SBOM consumers will.

@@ -4,7 +4,7 @@ package enginetest
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/engine"
+	"github.com/lafke/lafke/internal/engine"
 )
 
 // Require skips the test unless the engine executable can be located.

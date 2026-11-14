@@ -6,10 +6,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/policy"
-	"github.com/lafke/cli/internal/scanner"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/policy"
+	"github.com/lafke/lafke/internal/scanner"
+	"github.com/lafke/lafke/pkg/lockfile"
 	"github.com/spf13/cobra"
 )
 

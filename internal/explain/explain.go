@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/lafke/cli/internal/typosquat"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/typosquat"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 type Result struct {

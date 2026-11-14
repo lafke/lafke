@@ -1,7 +1,7 @@
 package poetry
 
 import (
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 	"github.com/pelletier/go-toml/v2"
 )
 

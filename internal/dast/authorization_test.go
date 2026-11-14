@@ -3,7 +3,7 @@ package dast_test
 import (
 	"context"
 	"fmt"
-	"github.com/lafke/cli/internal/dast"
+	"github.com/lafke/lafke/internal/dast"
 	"net/http"
 	"net/http/httptest"
 	"strings"

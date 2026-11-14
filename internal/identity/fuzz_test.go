@@ -7,7 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/lafke/cli/internal/identity"
+	"github.com/lafke/lafke/internal/identity"
 	"math/big"
 	"testing"
 	"time"

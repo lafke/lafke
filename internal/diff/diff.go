@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/lafke/cli/pkg/lockfile"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 type Side struct {

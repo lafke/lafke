@@ -9,16 +9,16 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/evidence"
-	"github.com/lafke/cli/internal/network"
-	"github.com/lafke/cli/internal/osv"
-	"github.com/lafke/cli/internal/progress"
-	"github.com/lafke/cli/internal/provenance"
-	"github.com/lafke/cli/internal/reachability"
-	"github.com/lafke/cli/internal/trust"
-	"github.com/lafke/cli/pkg/lockfile"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/evidence"
+	"github.com/lafke/lafke/internal/network"
+	"github.com/lafke/lafke/internal/osv"
+	"github.com/lafke/lafke/internal/progress"
+	"github.com/lafke/lafke/internal/provenance"
+	"github.com/lafke/lafke/internal/reachability"
+	"github.com/lafke/lafke/internal/trust"
+	"github.com/lafke/lafke/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 type Options struct {

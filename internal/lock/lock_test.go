@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/lock"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/lock"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func validEvidence() lockfile.Evidence {

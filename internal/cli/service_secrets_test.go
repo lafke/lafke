@@ -3,8 +3,8 @@ package cli_test
 import (
 	"bytes"
 	"encoding/base64"
-	"github.com/lafke/cli/internal/control"
-	"github.com/lafke/cli/internal/identity"
+	"github.com/lafke/lafke/internal/control"
+	"github.com/lafke/lafke/internal/identity"
 	"os"
 	"path/filepath"
 	"testing"

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // extractChain walks an npm attestations payload and pulls source/build

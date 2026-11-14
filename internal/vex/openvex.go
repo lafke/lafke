@@ -6,8 +6,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/lafke/cli/pkg/exceptions"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/exceptions"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 type openVEX struct {

@@ -3,9 +3,9 @@ package cli
 import (
 	"fmt"
 
-	"github.com/lafke/cli/internal/lock"
-	"github.com/lafke/cli/internal/policy"
-	"github.com/lafke/cli/internal/scanner"
+	"github.com/lafke/lafke/internal/lock"
+	"github.com/lafke/lafke/internal/policy"
+	"github.com/lafke/lafke/internal/scanner"
 	"github.com/spf13/cobra"
 )
 

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/lock"
-	"github.com/lafke/cli/internal/policy"
+	"github.com/lafke/lafke/internal/lock"
+	"github.com/lafke/lafke/internal/policy"
 )
 
 const initLockfile = `{"name":"app","lockfileVersion":3,"packages":{"":{"name":"app"},"node_modules/ms":{"version":"2.1.3","resolved":"https://registry.npmjs.org/ms/-/ms-2.1.3.tgz","integrity":"sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="}}}`

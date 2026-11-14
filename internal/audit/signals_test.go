@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/audit"
-	"github.com/lafke/cli/internal/exploit"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/audit"
+	"github.com/lafke/lafke/internal/exploit"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func TestExploitSignalsRaiseSeverity(t *testing.T) {

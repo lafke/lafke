@@ -186,7 +186,7 @@ type sarifLogicalLocation struct {
 func WriteSARIF(w io.Writer, r Report) error {
 	driver := sarifDriver{
 		Name:           "lafke " + r.Tool,
-		InformationURI: "https://github.com/lafke/cli",
+		InformationURI: "https://github.com/lafke/lafke",
 		Rules:          []sarifRule{},
 	}
 	results := make([]sarifResult, 0, len(r.Findings))

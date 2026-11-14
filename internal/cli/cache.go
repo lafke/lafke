@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/lafke/cli/internal/httpx"
+	"github.com/lafke/lafke/internal/httpx"
 	"github.com/spf13/cobra"
 )
 

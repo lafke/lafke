@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/exceptions"
-	"github.com/lafke/cli/internal/finding"
-	pkg "github.com/lafke/cli/pkg/exceptions"
+	"github.com/lafke/lafke/internal/exceptions"
+	"github.com/lafke/lafke/internal/finding"
+	pkg "github.com/lafke/lafke/pkg/exceptions"
 )
 
 var now = time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)

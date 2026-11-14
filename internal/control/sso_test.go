@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/lafke/cli/internal/control"
+	"github.com/lafke/lafke/internal/control"
 	"net/http"
 	"net/http/httptest"
 	"net/url"

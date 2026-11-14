@@ -5,11 +5,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/license"
-	"github.com/lafke/cli/internal/typosquat"
-	"github.com/lafke/cli/pkg/lockfile"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/license"
+	"github.com/lafke/lafke/internal/typosquat"
+	"github.com/lafke/lafke/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 func Evaluate(art *lockfile.Artifact, pol policy.Document) {

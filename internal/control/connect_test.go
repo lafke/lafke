@@ -3,7 +3,7 @@ package control_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/lafke/cli/internal/control"
+	"github.com/lafke/lafke/internal/control"
 	"net/http"
 	"net/http/httptest"
 	"testing"

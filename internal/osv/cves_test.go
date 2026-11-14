@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/lafke/cli/internal/osv"
+	"github.com/lafke/lafke/internal/osv"
 )
 
 func TestDetailsCVEs(t *testing.T) {

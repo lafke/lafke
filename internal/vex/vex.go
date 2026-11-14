@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lafke/cli/internal/sbom"
-	"github.com/lafke/cli/pkg/exceptions"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/sbom"
+	"github.com/lafke/lafke/pkg/exceptions"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // ErrNothingToExport means no active exception names an advisory present in the lockfile.

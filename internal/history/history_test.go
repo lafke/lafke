@@ -2,8 +2,8 @@ package history_test
 
 import (
 	"context"
-	"github.com/lafke/cli/internal/engine/enginetest"
-	"github.com/lafke/cli/internal/history"
+	"github.com/lafke/lafke/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/history"
 	"os"
 	"os/exec"
 	"path/filepath"

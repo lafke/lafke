@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/npmrc"
-	"github.com/lafke/cli/internal/yarnrc"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/npmrc"
+	"github.com/lafke/lafke/internal/yarnrc"
 	"gopkg.in/yaml.v3"
 )
 

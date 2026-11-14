@@ -3,7 +3,7 @@ package osv
 import (
 	"strings"
 
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // Partition separates OSV hit IDs into vulnerabilities and malicious

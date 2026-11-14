@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // PropertyPrefix namespaces the trust evidence lafke adds to an SBOM.

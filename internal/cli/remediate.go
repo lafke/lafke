@@ -2,11 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"github.com/lafke/cli/internal/baseline"
-	"github.com/lafke/cli/internal/engine"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/progress"
-	"github.com/lafke/cli/internal/remediation"
+	"github.com/lafke/lafke/internal/baseline"
+	"github.com/lafke/lafke/internal/engine"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/progress"
+	"github.com/lafke/lafke/internal/remediation"
 	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/gradle"
+	"github.com/lafke/lafke/internal/ecosystem/gradle"
 )
 
 func FuzzDependencies(f *testing.F) {

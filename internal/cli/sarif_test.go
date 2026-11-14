@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/cli"
+	"github.com/lafke/lafke/internal/cli"
 )
 
 type sarifResults struct {

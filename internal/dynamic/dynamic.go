@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/lafke/cli/internal/dast"
+	"github.com/lafke/lafke/internal/dast"
 )
 
 //go:embed browser.cjs

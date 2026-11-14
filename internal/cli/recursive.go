@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lafke/cli/internal/workspace"
+	"github.com/lafke/lafke/internal/workspace"
 	"github.com/spf13/cobra"
 )
 

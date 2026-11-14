@@ -1,7 +1,7 @@
 package dast_test
 
 import (
-	"github.com/lafke/cli/internal/dast"
+	"github.com/lafke/lafke/internal/dast"
 	"strings"
 	"testing"
 )

@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 type npmSignature struct {

@@ -2,8 +2,8 @@ package control
 
 import (
 	"fmt"
-	"github.com/lafke/cli/internal/identity"
-	"github.com/lafke/cli/internal/lifecycle"
+	"github.com/lafke/lafke/internal/identity"
+	"github.com/lafke/lafke/internal/lifecycle"
 	"net/http"
 	"strings"
 	"time"

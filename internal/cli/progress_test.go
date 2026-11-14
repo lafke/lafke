@@ -2,12 +2,12 @@ package cli_test
 
 import (
 	"bytes"
-	"github.com/lafke/cli/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/engine/enginetest"
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/cli"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/cli"
+	"github.com/lafke/lafke/schemas"
 )
 
 func TestProgressKeepsCapturedReportsClean(t *testing.T) {

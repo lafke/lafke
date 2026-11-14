@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/deno"
+	"github.com/lafke/lafke/internal/ecosystem/deno"
 )
 
 func FuzzDependencies(f *testing.F) {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/cli"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/cli"
+	"github.com/lafke/lafke/schemas"
 )
 
 const importSARIF = `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Semgrep"}},"results":[

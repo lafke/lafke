@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 const MaxInventoryBytes = 16 << 20

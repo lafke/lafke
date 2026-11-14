@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/httpx"
-	"github.com/lafke/cli/internal/license"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/httpx"
+	"github.com/lafke/lafke/internal/license"
+	"github.com/lafke/lafke/pkg/lockfile"
 	"golang.org/x/mod/module"
 )
 

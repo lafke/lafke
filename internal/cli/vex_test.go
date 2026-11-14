@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/lock"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/lock"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // vulnerableProject writes a lockfile that records one advisory against lodash.

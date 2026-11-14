@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/lafke/cli/internal/license"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/license"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 type cdxBOM struct {

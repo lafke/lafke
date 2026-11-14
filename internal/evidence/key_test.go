@@ -3,8 +3,8 @@ package evidence_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/evidence"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/evidence"
 )
 
 func TestKeyIncludesFilename(t *testing.T) {

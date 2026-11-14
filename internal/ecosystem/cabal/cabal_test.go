@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/cabal"
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/cabal"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 func load(t *testing.T, files map[string]string) []core.Dependency {

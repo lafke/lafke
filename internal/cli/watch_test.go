@@ -1,7 +1,7 @@
 package cli_test
 
 import (
-	"github.com/lafke/cli/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/engine/enginetest"
 	"path/filepath"
 	"strings"
 	"testing"

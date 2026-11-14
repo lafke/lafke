@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func healthDoc(h *lockfile.HealthEvidence) lockfile.Document {

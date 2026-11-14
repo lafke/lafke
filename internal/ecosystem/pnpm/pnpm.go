@@ -3,8 +3,8 @@ package pnpm
 import (
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/npmrc"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/npmrc"
 	"gopkg.in/yaml.v3"
 )
 

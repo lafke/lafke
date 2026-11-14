@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/cocoapods"
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/cocoapods"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 func TestDependencies(t *testing.T) {

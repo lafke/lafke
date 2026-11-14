@@ -3,8 +3,8 @@ package prioritization
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/baseline"
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/baseline"
+	"github.com/lafke/lafke/internal/finding"
 	"io"
 	"slices"
 	"strings"

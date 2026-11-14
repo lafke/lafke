@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 // Count returns the number of chains at each severity, confirmed and possible alike.

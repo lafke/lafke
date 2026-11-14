@@ -2,8 +2,8 @@ package remediation
 
 import (
 	"fmt"
-	"github.com/lafke/cli/internal/engine"
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/engine"
+	"github.com/lafke/lafke/internal/finding"
 	"os"
 	"path/filepath"
 	"strings"

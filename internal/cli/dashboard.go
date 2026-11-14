@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"github.com/lafke/cli/internal/dashboard"
-	"github.com/lafke/cli/internal/lifecycle"
-	"github.com/lafke/cli/internal/runrecord"
+	"github.com/lafke/lafke/internal/dashboard"
+	"github.com/lafke/lafke/internal/lifecycle"
+	"github.com/lafke/lafke/internal/runrecord"
 	"github.com/spf13/cobra"
 	"os"
 )

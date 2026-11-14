@@ -2,7 +2,7 @@ package control_test
 
 import (
 	"context"
-	"github.com/lafke/cli/internal/control"
+	"github.com/lafke/lafke/internal/control"
 	"net/http"
 	"net/http/httptest"
 	"testing"

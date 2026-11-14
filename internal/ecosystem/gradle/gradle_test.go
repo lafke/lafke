@@ -3,8 +3,8 @@ package gradle_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/ecosystem/gradle"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/gradle"
 )
 
 func TestDependencies(t *testing.T) {

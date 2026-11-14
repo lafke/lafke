@@ -3,9 +3,9 @@ package trust_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/trust"
-	"github.com/lafke/cli/pkg/lockfile"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/trust"
+	"github.com/lafke/lafke/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 func healthArtifact(eco, name string, health *lockfile.HealthEvidence) lockfile.Artifact {

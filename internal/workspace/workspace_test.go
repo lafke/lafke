@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/lafke/cli/internal/workspace"
+	"github.com/lafke/lafke/internal/workspace"
 )
 
 func touch(t *testing.T, root string, paths ...string) {

@@ -2,7 +2,7 @@ package control_test
 
 import (
 	"bytes"
-	"github.com/lafke/cli/internal/control"
+	"github.com/lafke/lafke/internal/control"
 	"os"
 	"path/filepath"
 	"strings"

@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/lafke/cli/internal/decode"
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/pkg/exceptions"
+	"github.com/lafke/lafke/internal/decode"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/pkg/exceptions"
 	"gopkg.in/yaml.v3"
 )
 

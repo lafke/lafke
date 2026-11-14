@@ -5,9 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/inventory"
-	"github.com/lafke/cli/internal/release"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/inventory"
+	"github.com/lafke/lafke/internal/release"
 	"github.com/spf13/cobra"
 	"os"
 )

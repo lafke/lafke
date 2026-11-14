@@ -2,7 +2,7 @@ package control
 
 import (
 	"fmt"
-	"github.com/lafke/cli/internal/identity"
+	"github.com/lafke/lafke/internal/identity"
 )
 
 func validateState(s State) error {

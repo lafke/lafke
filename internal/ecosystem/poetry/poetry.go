@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/internal/network"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/network"
 	"github.com/pelletier/go-toml/v2"
 )
 

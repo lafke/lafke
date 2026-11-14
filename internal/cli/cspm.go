@@ -8,11 +8,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/lafke/cli/internal/cspm"
-	"github.com/lafke/cli/internal/exceptions"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/policy"
-	pkgpolicy "github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/cspm"
+	"github.com/lafke/lafke/internal/exceptions"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/policy"
+	pkgpolicy "github.com/lafke/lafke/pkg/policy"
 	"github.com/spf13/cobra"
 )
 

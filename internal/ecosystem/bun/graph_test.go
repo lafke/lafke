@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/bun"
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/bun"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 func TestScopeAndEdges(t *testing.T) {

@@ -3,7 +3,7 @@ package schemas_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/schemas"
 )
 
 func TestURLArtifactOmitsVersion(t *testing.T) {

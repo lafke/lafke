@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/lafke/cli/internal/reachability"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/reachability"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func art(name string, scope lockfile.Scope, deps []string, vulns ...string) lockfile.Artifact {

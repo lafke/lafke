@@ -3,7 +3,7 @@ package core_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 func TestRemoteLocation(t *testing.T) {

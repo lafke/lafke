@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/sbom"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/sbom"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func art(eco, name, version, digest string) lockfile.Artifact {

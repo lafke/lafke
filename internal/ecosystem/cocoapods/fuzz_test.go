@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/cocoapods"
+	"github.com/lafke/lafke/internal/ecosystem/cocoapods"
 )
 
 func FuzzDependencies(f *testing.F) {

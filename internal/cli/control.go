@@ -2,7 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"github.com/lafke/cli/internal/control"
+	"github.com/lafke/lafke/internal/control"
 	"github.com/spf13/cobra"
 	"os"
 )

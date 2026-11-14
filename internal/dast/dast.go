@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 const DefaultTimeout = 15 * time.Second

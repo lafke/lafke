@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/lafke/cli/internal/credential"
+	"github.com/lafke/lafke/internal/credential"
 	"net/http"
 	"net/http/httptest"
 	"strings"

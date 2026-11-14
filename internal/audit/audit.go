@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lafke/cli/internal/exploit"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/network"
-	"github.com/lafke/cli/internal/scorecard"
-	"github.com/lafke/cli/internal/typosquat"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/exploit"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/network"
+	"github.com/lafke/lafke/internal/scorecard"
+	"github.com/lafke/lafke/internal/typosquat"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // staleAfter is how long after its release a version is reported as stale.

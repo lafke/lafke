@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/evidence"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/evidence"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func TestNPMEvidence(t *testing.T) {

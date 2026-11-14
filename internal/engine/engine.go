@@ -15,7 +15,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 // ProtocolVersion is the engine protocol this CLI speaks.

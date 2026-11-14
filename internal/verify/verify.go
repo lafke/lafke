@@ -1,8 +1,8 @@
 package verify
 
 import (
-	"github.com/lafke/cli/internal/diff"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/diff"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func Compare(locked, current lockfile.Document) diff.Result {

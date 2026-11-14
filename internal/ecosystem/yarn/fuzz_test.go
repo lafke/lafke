@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/yarn"
+	"github.com/lafke/lafke/internal/ecosystem/yarn"
 )
 
 func FuzzDependencies(f *testing.F) {

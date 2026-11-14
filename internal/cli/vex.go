@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lafke/cli/internal/exceptions"
-	"github.com/lafke/cli/internal/sbom"
-	"github.com/lafke/cli/internal/vex"
-	pkgexceptions "github.com/lafke/cli/pkg/exceptions"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/exceptions"
+	"github.com/lafke/lafke/internal/sbom"
+	"github.com/lafke/lafke/internal/vex"
+	pkgexceptions "github.com/lafke/lafke/pkg/exceptions"
+	"github.com/lafke/lafke/pkg/lockfile"
 	"github.com/spf13/cobra"
 )
 

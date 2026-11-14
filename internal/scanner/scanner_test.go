@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/evidence"
-	"github.com/lafke/cli/internal/osv"
-	"github.com/lafke/cli/internal/scanner"
-	"github.com/lafke/cli/pkg/lockfile"
-	"github.com/lafke/cli/pkg/policy"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/evidence"
+	"github.com/lafke/lafke/internal/osv"
+	"github.com/lafke/lafke/internal/scanner"
+	"github.com/lafke/lafke/pkg/lockfile"
+	"github.com/lafke/lafke/pkg/policy"
 )
 
 type fakeOSV struct {

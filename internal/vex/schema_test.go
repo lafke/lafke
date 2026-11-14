@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/lafke/cli/internal/vex"
-	"github.com/lafke/cli/pkg/exceptions"
+	"github.com/lafke/lafke/internal/vex"
+	"github.com/lafke/lafke/pkg/exceptions"
 )
 
 func TestVEXIsValidAgainstTheOfficialSchemas(t *testing.T) {

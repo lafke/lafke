@@ -1,7 +1,7 @@
 package cli_test
 
 import (
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/schemas"
 	"os"
 	"path/filepath"
 	"runtime"

@@ -3,8 +3,8 @@ package scanner
 import (
 	"strings"
 
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // Findings reports every artifact that did not pass the active policy.

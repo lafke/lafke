@@ -14,8 +14,8 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/lafke/cli/internal/ecosystem/core"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/ecosystem/core"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 // pep740Attestation is the PEP 740 attestation object. encoding/json

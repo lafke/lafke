@@ -3,11 +3,11 @@ package cli_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/lafke/cli/internal/engine/enginetest"
+	"github.com/lafke/lafke/internal/engine/enginetest"
 	"testing"
 
-	"github.com/lafke/cli/internal/cli"
-	"github.com/lafke/cli/schemas"
+	"github.com/lafke/lafke/internal/cli"
+	"github.com/lafke/lafke/schemas"
 )
 
 // runCLIExpectError runs the CLI and fails the test when it exits 0.

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem/bundler"
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem/bundler"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 func TestDependencies(t *testing.T) {

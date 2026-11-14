@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/progress"
+	"github.com/lafke/lafke/internal/progress"
 )
 
 func TestReporterIsOptionalAndScoped(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 const regenerate = "Regenerate the SBOM with lafke sbom export."

@@ -3,8 +3,8 @@ package verify_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/verify"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/verify"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func TestCompareTrustDrift(t *testing.T) {

@@ -2,9 +2,9 @@ package lifecycle
 
 import (
 	"fmt"
-	"github.com/lafke/cli/internal/baseline"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/internal/runrecord"
+	"github.com/lafke/lafke/internal/baseline"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/internal/runrecord"
 	"slices"
 	"strconv"
 	"strings"

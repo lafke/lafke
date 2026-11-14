@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/audit"
-	"github.com/lafke/cli/internal/finding"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/audit"
+	"github.com/lafke/lafke/internal/finding"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func TestHealthFindings(t *testing.T) {

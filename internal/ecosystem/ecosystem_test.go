@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/ecosystem/core"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/ecosystem/core"
 )
 
 func TestPreferPnpmOverNpm(t *testing.T) {

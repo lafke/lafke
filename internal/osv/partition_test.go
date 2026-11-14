@@ -3,8 +3,8 @@ package osv_test
 import (
 	"testing"
 
-	"github.com/lafke/cli/internal/osv"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/osv"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func TestPartitionMaliciousIDs(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lafke/cli/internal/doctor"
-	"github.com/lafke/cli/internal/finding"
+	"github.com/lafke/lafke/internal/doctor"
+	"github.com/lafke/lafke/internal/finding"
 )
 
 func write(t *testing.T, dir, name, body string) {

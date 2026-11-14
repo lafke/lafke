@@ -7,10 +7,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/lafke/cli/internal/ecosystem"
-	"github.com/lafke/cli/internal/evidence"
-	"github.com/lafke/cli/internal/httpx"
-	"github.com/lafke/cli/pkg/lockfile"
+	"github.com/lafke/lafke/internal/ecosystem"
+	"github.com/lafke/lafke/internal/evidence"
+	"github.com/lafke/lafke/internal/httpx"
+	"github.com/lafke/lafke/pkg/lockfile"
 )
 
 func TestPublicRegistryHealthWithoutInventedSignatures(t *testing.T) {

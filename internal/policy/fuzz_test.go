@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lafke/cli/internal/policy"
+	"github.com/lafke/lafke/internal/policy"
 )
 
 func FuzzLoad(f *testing.F) {
