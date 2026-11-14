@@ -118,6 +118,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.AddCommand(newAcceptCommand(opts))
 	root.AddCommand(newVEXCommand(opts))
 	root.AddCommand(newCacheCommand())
+	root.AddCommand(newUninstallCommand())
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the version",

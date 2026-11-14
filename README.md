@@ -22,6 +22,10 @@ The installer puts two executables next to each other:
 `lafke` looks for the engine in the directory of its own executable, then on `PATH`.
 Set `LAFKE_ENGINE` to use an engine at another location.
 
+To remove everything the installer added, run `lafke uninstall` (`--dry-run` lists
+what would go, `--yes` skips the prompt, `--keep-cache` keeps the response cache). Project
+files such as `lafke.lock` are never touched.
+
 ## Usage
 
 ```sh
