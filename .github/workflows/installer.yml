@@ -1,0 +1,44 @@
+name: Installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "installer/**"
+      - "scripts/install.sh"
+      - ".github/workflows/installer.yml"
+  pull_request:
+    paths:
+      - "installer/**"
+      - "scripts/install.sh"
+      - ".github/workflows/installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    name: lafke.sh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check script syntax
+        run: sh -n scripts/install.sh
+      - name: Build site
+        run: sh installer/build.sh
+      - name: Dry-run deploy
+        if: github.event_name == 'pull_request'
+        run: npx --yes wrangler@4.20.0 deploy --dry-run
+        working-directory: installer
+      - name: Deploy to Cloudflare Workers
+        if: github.event_name != 'pull_request'
+        run: npx --yes wrangler@4.20.0 deploy
+        working-directory: installer
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
