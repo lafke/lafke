@@ -138,6 +138,19 @@ if [ "$got" != "$expected" ]; then
   exit 1
 fi
 
+# With gh available, the archive must also carry a valid GitHub attestation from REPO.
+if command -v gh >/dev/null 2>&1; then
+  if gh auth status >/dev/null 2>&1; then
+    if ! gh attestation verify "${tmp}/${archive}" --repo "$REPO" >"${tmp}/attestation.log" 2>&1; then
+      cat "${tmp}/attestation.log" >&2
+      echo "attestation verification failed for ${archive}" >&2
+      exit 1
+    fi
+  else
+    echo "gh is not authenticated; skipping attestation verification" >&2
+  fi
+fi
+
 tar -xzf "${tmp}/${archive}" -C "$tmp"
 install -m 0755 "${tmp}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 install -m 0755 "${tmp}/${ENGINE_BINARY}" "${INSTALL_DIR}/${ENGINE_BINARY}"
