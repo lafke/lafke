@@ -13,7 +13,37 @@ permissions:
   contents: read
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check that the tag points at main in this repository and in the engine
+        env:
+          GH_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          git fetch origin main
+          tag_commit=$(git rev-parse HEAD)
+          main_commit=$(git rev-parse origin/main)
+          if [ "$tag_commit" != "$main_commit" ]; then
+            echo "$TAG must point at the current main commit of $GITHUB_REPOSITORY." >&2
+            echo "tag:  $tag_commit" >&2
+            echo "main: $main_commit" >&2
+            exit 1
+          fi
+          engine_tag=$(gh api "repos/lafke/engine/commits/${TAG}" --jq .sha)
+          engine_main=$(gh api repos/lafke/engine/commits/main --jq .sha)
+          if [ "$engine_tag" != "$engine_main" ]; then
+            echo "$TAG must point at the current main commit of lafke/engine." >&2
+            echo "tag:  $engine_tag" >&2
+            echo "main: $engine_main" >&2
+            exit 1
+          fi
+
   package:
+    needs: verify
     strategy:
       fail-fast: true
       matrix:
@@ -48,6 +78,7 @@ jobs:
           if-no-files-found: error
 
   sbom:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
