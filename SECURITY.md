@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report security issues privately through GitHub Security Advisories
-on [lafke/lafke](https://github.com/lafke/cli/security/advisories/new).
+on [lafke/lafke](https://github.com/lafke/lafke/security/advisories/new).
 
 Do not open a public issue for an unreleased vulnerability.
 

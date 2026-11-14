@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-REPO="${REPO:-lafke/cli}"
+REPO="${REPO:-lafke/lafke}"
 BINARY="${BINARY:-lafke}"
 ENGINE_BINARY="${ENGINE_BINARY:-lafke-engine}"
 INSTALL_DIR="${INSTALL_DIR:-}"
