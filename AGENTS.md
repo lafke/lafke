@@ -66,5 +66,7 @@ committing as if it passed.
 - Match the surrounding code: naming, comment density, idiom.
 - Keep changes small and focused. No drive-by refactors.
 - Code, comments, commit messages, and everything published to GitHub are in English.
+- Every commit message follows Conventional Commits, is all lowercase, and is concise
+  (e.g. `fix(cli): handle empty lockfile`).
 - A change to a request or response of the engine protocol bumps `ProtocolVersion` here
   and `protocolVersion` in the engine together.
