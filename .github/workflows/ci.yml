@@ -37,8 +37,9 @@ jobs:
         run: bash action/run_test.sh
 
   # The combination users run: this CLI with the newest released engine. The public
-  # release needs no secret, so this also runs on pull requests from forks. LAFKE_ENGINE
-  # stays unset so the lookup in the install directory is exercised too.
+  # release needs no secret, so this also runs on pull requests from forks. Some tests
+  # replace HOME, which hides the install directory, so the installed engine is passed
+  # through LAFKE_ENGINE.
   test-released-engine:
     runs-on: ubuntu-latest
     steps:
@@ -53,6 +54,7 @@ jobs:
           go build -o bin/ ./cmd/lafke
           bin/lafke engine install
           bin/lafke engine status
+          echo "LAFKE_ENGINE=$(find "$HOME/.cache/lafke/engine" -name lafke-engine -type f)" >> "$GITHUB_ENV"
       - name: Test
         run: go test ./...
 
