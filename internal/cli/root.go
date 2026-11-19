@@ -117,6 +117,7 @@ func NewRoot(version, commit, date string) *cobra.Command {
 	root.AddCommand(newReleaseCommand(opts))
 	root.AddCommand(newAcceptCommand(opts))
 	root.AddCommand(newVEXCommand(opts))
+	root.AddCommand(newEngineCommand(opts))
 	root.AddCommand(newCacheCommand())
 	root.AddCommand(newUninstallCommand())
 	root.AddCommand(&cobra.Command{

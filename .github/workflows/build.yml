@@ -1,7 +1,7 @@
 name: Build
 
-# Builds the CLI and the engine from their main branches for every release platform, so
-# a broken combination is found before a release is cut.
+# Builds the CLI for every release platform, so a broken build is found before a release
+# is cut. The engine is built and released by lafke/engine-releases.
 on:
   push:
     branches: [main]
@@ -28,24 +28,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: lafke/engine
-          path: engine
-          token: ${{ secrets.REPO_ACCESS_TOKEN }}
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache-dependency-path: |
-            go.sum
-            engine/go.sum
+          cache-dependency-path: go.sum
       - name: Package
         run: sh scripts/package.sh ${{ matrix.goos }} ${{ matrix.goarch }} dev
       - name: Smoke test
         if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir smoke && tar -xzf dist/lafke_linux_amd64.tar.gz -C smoke
           smoke/lafke version
-          smoke/lafke-engine version
+          smoke/lafke engine install
+          smoke/lafke engine status
           mkdir sample && printf 'package main\n\nfunc main() {}\n' > sample/main.go
           (cd sample && ../smoke/lafke sast . --offline)

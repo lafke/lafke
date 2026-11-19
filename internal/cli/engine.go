@@ -1,0 +1,114 @@
+package cli
+
+import (
+	"errors"
+	"fmt"
+	"os"
+
+	"github.com/lafke/lafke/internal/engine"
+	"github.com/spf13/cobra"
+)
+
+func newEngineCommand(opts *options) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "engine",
+		Short: "Install and inspect the source-code analysis engine",
+		Long: `The analysis engine is a separate executable, released on its own schedule from
+` + engine.ReleasesRepo + `. install downloads the newest engine that speaks this
+lafke's protocol, checks its sha256 and its GitHub provenance attestation, and keeps it
+in the user cache. lafke finds it there when no engine sits next to it or is set with
+` + engine.EnvPath + `.
+
+Set ` + engine.EnvVersion + ` to pin a version for a run. Commands that do not analyze source
+code work without the engine.`,
+	}
+	cmd.AddCommand(newEngineInstallCommand(opts, "install", "Download and install the engine"))
+	cmd.AddCommand(newEngineInstallCommand(opts, "update", "Install the newest compatible engine and remove older ones"))
+	cmd.AddCommand(newEngineStatusCommand())
+	return cmd
+}
+
+func newEngineInstallCommand(opts *options, use, short string) *cobra.Command {
+	var version string
+	var skipAttestation bool
+	update := use == "update"
+	cmd := &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.offline || opts.network == "offline" {
+				return opErr(errors.New("cannot download the engine in offline mode"))
+			}
+			out := cmd.OutOrStdout()
+			in, err := engine.Install(cmd.Context(), engine.InstallOptions{
+				Version:         version,
+				SkipAttestation: skipAttestation,
+				Token:           githubToken(),
+				Progress:        func(stage string) { fmt.Fprintln(cmd.ErrOrStderr(), stage) },
+			})
+			if err != nil {
+				return opErr(err)
+			}
+			if skipAttestation {
+				fmt.Fprintln(cmd.ErrOrStderr(), "warning: attestation verification skipped")
+			}
+			fmt.Fprintf(out, "installed lafke-engine %s (protocol %d)\n  %s\n", in.Version, in.Protocol, in.Path)
+			if update {
+				removed, err := engine.Remove(in.Version)
+				for _, v := range removed {
+					fmt.Fprintf(out, "removed lafke-engine %s\n", v)
+				}
+				if err != nil {
+					return opErr(err)
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&skipAttestation, "skip-attestation", false, "install without verifying the GitHub attestation (the sha256 is still checked)")
+	if !update {
+		cmd.Flags().StringVar(&version, "version", "", "engine release tag to install (default: newest compatible)")
+	}
+	return cmd
+}
+
+func newEngineStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show which engine lafke uses and which are installed",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "protocol: %d\n", engine.ProtocolVersion)
+			path, err := engine.Locate()
+			if err != nil {
+				fmt.Fprintf(out, "engine:   not found (%v)\n", err)
+			} else {
+				version, cerr := engine.CheckVersion()
+				if cerr != nil {
+					fmt.Fprintf(out, "engine:   %s (%v)\n", path, cerr)
+				} else {
+					fmt.Fprintf(out, "engine:   %s (%s)\n", path, version)
+				}
+			}
+			installed := engine.List()
+			fmt.Fprintf(out, "installed in %s:\n", engine.InstallDir())
+			if len(installed) == 0 {
+				fmt.Fprintln(out, "  none")
+			}
+			for _, in := range installed {
+				fmt.Fprintf(out, "  %s\n", in.Version)
+			}
+			return nil
+		},
+	}
+}
+
+// githubToken returns the token used for GitHub requests, if the environment has one.
+func githubToken() string {
+	if t := os.Getenv("GH_TOKEN"); t != "" {
+		return t
+	}
+	return os.Getenv("GITHUB_TOKEN")
+}

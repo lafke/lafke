@@ -3,10 +3,10 @@ set -eu
 
 REPO="${REPO:-lafke/lafke}"
 BINARY="${BINARY:-lafke}"
-ENGINE_BINARY="${ENGINE_BINARY:-lafke-engine}"
 INSTALL_DIR="${INSTALL_DIR:-}"
 VERSION="${VERSION:-}"
 SKIP_ATTESTATION="${SKIP_ATTESTATION:-}"
+SKIP_ENGINE="${SKIP_ENGINE:-}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -16,6 +16,10 @@ while [ $# -gt 0 ]; do
       ;;
     --skip-attestation)
       SKIP_ATTESTATION=1
+      shift
+      ;;
+    --skip-engine)
+      SKIP_ENGINE=1
       shift
       ;;
     *)
@@ -161,7 +165,7 @@ verify_attestation() {
   fi
 }
 
-# The archive and the executables in it must carry a valid GitHub attestation from REPO.
+# The archive and the executable in it must carry a valid GitHub attestation from REPO.
 # Nothing is installed until they do.
 if [ -n "$SKIP_ATTESTATION" ]; then
   echo "warning: attestation verification skipped" >&2
@@ -179,18 +183,25 @@ tar -xzf "${tmp}/${archive}" -C "$tmp"
 
 if [ -z "$SKIP_ATTESTATION" ]; then
   verify_attestation "${tmp}/${BINARY}" "$BINARY"
-  verify_attestation "${tmp}/${ENGINE_BINARY}" "$ENGINE_BINARY"
   say "attestation ok"
 fi
 
 install -m 0755 "${tmp}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-install -m 0755 "${tmp}/${ENGINE_BINARY}" "${INSTALL_DIR}/${ENGINE_BINARY}"
 
 say ""
 say "installed:"
 say "  ${INSTALL_DIR}/${BINARY}"
-say "  ${INSTALL_DIR}/${ENGINE_BINARY}"
 "${INSTALL_DIR}/${BINARY}" version
+
+# The analysis engine is released separately; the CLI downloads and verifies it.
+if [ -n "$SKIP_ENGINE" ]; then
+  say ""
+  say "skipped the analysis engine; install it later with: ${BINARY} engine install"
+elif [ -n "$SKIP_ATTESTATION" ]; then
+  "${INSTALL_DIR}/${BINARY}" engine install --skip-attestation
+else
+  "${INSTALL_DIR}/${BINARY}" engine install
+fi
 
 case ":${PATH}:" in
   *":${INSTALL_DIR}:"*) ;;

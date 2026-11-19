@@ -14,12 +14,16 @@ vulnerabilities, secrets and unsafe infrastructure settings. Pre-1.0, Go version
 Source-code analysis is not part of this repository. It runs in a separate executable,
 `lafke-engine`, which the CLI starts through `internal/engine`. The CLI and the engine
 speak a versioned JSON protocol; see `ProtocolVersion` in `internal/engine/engine.go`.
+The engine is released on its own schedule: its source is private, so the public
+`lafke/engine-releases` repository builds, attests and publishes the binaries, and
+`lafke engine install` downloads the newest one that speaks this CLI's protocol.
 
 ## Layout
 
 - `cmd/lafke`: entrypoint. `internal/cli`: one cobra command per file, registered in
   `root.go`.
-- `internal/engine`: client for the analysis engine (`Analyze`, `SecretContents`, `Calls`).
+- `internal/engine`: client for the analysis engine (`Analyze`, `SecretContents`, `Calls`)
+  and `Install`, which downloads released engines into the user cache.
   `internal/engine/enginetest.Require` skips a test when no engine is available.
 - `internal/ecosystem/<resolver>`: one lockfile parser per package manager.
   `internal/evidence`, `internal/osv`: registry and OSV lookups.
@@ -28,11 +32,11 @@ speak a versioned JSON protocol; see `ProtocolVersion` in `internal/engine/engin
 - `pkg/lockfile`, `pkg/policy`, `pkg/exceptions`: public types and validation.
 - `schemas/`: JSON schemas, embedded and used to validate command output.
 - `docs/`, `examples/`, `action/` + `action.yml`, `scripts/install.sh`.
-- `scripts/package.sh <goos> <goarch> <version>`: builds the CLI and the engine and writes
+- `scripts/package.sh <goos> <goarch> <version>`: builds the CLI and writes
   `lafke_<os>_<arch>.tar.gz` (`.zip` on Windows). `.github/workflows/build.yml` runs it
   for every platform; `release.yml` runs it at a `v*` tag, attests provenance and publishes
-  the release. Both check the engine out into `engine/`. A release tag must exist with the
-  same name in this repository and in `lafke/engine`.
+  the release. The engine is not part of it. Its release tag is independent of this
+  repository's.
 
 ## Commands
 
@@ -68,5 +72,7 @@ committing as if it passed.
 - Code, comments, commit messages, and everything published to GitHub are in English.
 - Every commit message follows Conventional Commits, is all lowercase, and is concise
   (e.g. `fix(cli): handle empty lockfile`).
-- A change to a request or response of the engine protocol bumps `ProtocolVersion` here
-  and `protocolVersion` in the engine together.
+- A change to a request or response of the engine protocol that an engine or CLI of the
+  other version cannot handle bumps `ProtocolVersion` here and `protocolVersion` in the
+  engine together. A backward compatible addition, such as a new optional field, does not.
+  `lafke engine install` only selects engines whose protocol equals `ProtocolVersion`.

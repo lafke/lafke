@@ -1,8 +1,9 @@
 #!/bin/sh
-# Builds the CLI and the engine for one platform and packages them in one archive.
+# Builds the CLI for one platform and packages it in one archive. The engine is released
+# separately; see lafke/engine-releases and `lafke engine install`.
 #
 # usage: package.sh <goos> <goarch> <version>
-# env:   CLI_DIR (default .), ENGINE_DIR (default ./engine), OUT_DIR (default ./dist)
+# env:   CLI_DIR (default .), OUT_DIR (default ./dist)
 set -eu
 
 goos=${1:?goos}
@@ -10,7 +11,6 @@ goarch=${2:?goarch}
 version=${3:?version}
 
 CLI_DIR=$(cd "${CLI_DIR:-.}" && pwd)
-ENGINE_DIR=$(cd "${ENGINE_DIR:-engine}" && pwd)
 mkdir -p "${OUT_DIR:-dist}"
 OUT_DIR=$(cd "${OUT_DIR:-dist}" && pwd)
 
@@ -27,17 +27,14 @@ export CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch"
 (cd "$CLI_DIR" && go build -trimpath \
   -ldflags "-s -w -X main.version=${version} -X main.commit=${commit} -X main.date=${date}" \
   -o "$stage/lafke${ext}" ./cmd/lafke)
-(cd "$ENGINE_DIR" && go build -trimpath \
-  -ldflags "-s -w -X main.version=${version}" \
-  -o "$stage/lafke-engine${ext}" ./cmd/lafke-engine)
 
 cp "$CLI_DIR/LICENSE" "$stage/LICENSE"
 
 name="lafke_${goos}_${goarch}"
 if [ "$goos" = windows ]; then
-  (cd "$stage" && zip -q "$OUT_DIR/${name}.zip" lafke.exe lafke-engine.exe LICENSE)
+  (cd "$stage" && zip -q "$OUT_DIR/${name}.zip" lafke.exe LICENSE)
   echo "$OUT_DIR/${name}.zip"
 else
-  tar -C "$stage" -czf "$OUT_DIR/${name}.tar.gz" lafke lafke-engine LICENSE
+  tar -C "$stage" -czf "$OUT_DIR/${name}.tar.gz" lafke LICENSE
   echo "$OUT_DIR/${name}.tar.gz"
 fi

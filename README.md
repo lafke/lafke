@@ -28,15 +28,22 @@ with `gh auth login`; without it the installer stops. Pass `--skip-attestation` 
 without verifying. Windows builds are published as zip archives on the
 [releases page](https://github.com/lafke/lafke/releases).
 
-Each release archive holds two executables that belong together:
+Two executables work together:
 
 - `lafke`: the command-line interface (this repository).
 - `lafke-engine`: the source-code analysis engine that `lafke` starts for
-  `sast`, `security`, `chain` and related commands.
+  `sast`, `security`, `chain` and related commands. It is released separately, from
+  [lafke/engine-releases](https://github.com/lafke/engine-releases).
 
-`lafke` looks for the engine in the directory of its own executable, then on `PATH`.
-Set `LAFKE_ENGINE` to use an engine at another location. Commands that do not analyze
-source code, such as `scan`, `lock` and `verify`, work without the engine.
+The installer runs `lafke engine install` for you (`--skip-engine` leaves it out). That
+command downloads the newest engine that speaks this `lafke`'s protocol, checks its
+sha256 and its GitHub attestation, and keeps it in the user cache. `lafke engine update`
+installs a newer one and removes the old ones, and `lafke engine status` shows which
+engine is in use. Set `LAFKE_ENGINE_VERSION` to pin a version.
+
+`lafke` looks for the engine in this order: `LAFKE_ENGINE`, the directory of its own
+executable, the engines installed by `lafke engine install`, then `PATH`. Commands that
+do not analyze source code, such as `scan`, `lock` and `verify`, work without the engine.
 
 ## Usage
 
@@ -70,8 +77,8 @@ A [pre-commit](https://pre-commit.com) hook is provided in
 lafke uninstall
 ```
 
-This removes the `lafke` executable, the `lafke-engine` next to it and the
-response cache. `--dry-run` lists what would go, `--yes` skips the prompt, `--keep-cache`
+This removes the `lafke` executable, the `lafke-engine` next to it, the engines
+downloaded by `lafke engine install` and the response cache. `--dry-run` lists what would go, `--yes` skips the prompt, `--keep-cache`
 keeps the cache. Project files such as `lafke.lock` are never touched.
 
 ## Documentation
@@ -90,8 +97,8 @@ go test ./...
 
 Building this repository gives you the CLI only. The engine lives in a separate,
 private repository; tests that need it are skipped unless `LAFKE_ENGINE` points to a
-`lafke-engine` executable. `scripts/package.sh <goos> <goarch> <version>` builds both
-into a release archive when the engine is checked out in `engine/`.
+`lafke-engine` executable; `lafke engine install` fetches a released one.
+`scripts/package.sh <goos> <goarch> <version>` builds the CLI release archive.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and
 [SECURITY.md](SECURITY.md) to report a vulnerability.
