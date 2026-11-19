@@ -36,6 +36,26 @@ jobs:
       - name: Action script
         run: bash action/run_test.sh
 
+  # The combination users run: this CLI with the newest released engine. The public
+  # release needs no secret, so this also runs on pull requests from forks. LAFKE_ENGINE
+  # stays unset so the lookup in the install directory is exercised too.
+  test-released-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install released engine
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          go build -o bin/ ./cmd/lafke
+          bin/lafke engine install
+          bin/lafke engine status
+      - name: Test
+        run: go test ./...
+
   race:
     runs-on: ubuntu-latest
     steps:
