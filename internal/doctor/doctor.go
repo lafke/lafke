@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lafke/lafke/internal/engine"
 	"github.com/lafke/lafke/internal/exceptions"
 	"github.com/lafke/lafke/internal/finding"
 	"github.com/lafke/lafke/internal/lock"
@@ -23,6 +24,9 @@ type Options struct {
 	Profile    string
 	// ExceptionsPath overrides the accepted-findings file.
 	ExceptionsPath string
+	// Engine reports the version of the analysis engine lafke would use. Nil skips
+	// the engine check.
+	Engine func() (string, error)
 	// Now is the clock for expiry checks; the zero value uses time.Now.
 	Now func() time.Time
 }
@@ -39,10 +43,28 @@ func Run(opts Options) finding.Report {
 	out = append(out, checkLock(opts)...)
 	out = append(out, checkPolicy(opts)...)
 	out = append(out, checkExceptions(opts)...)
+	out = append(out, checkEngine(opts)...)
 	out = append(out, checkRegistryConfig(opts.Root)...)
 	out = append(out, checkWorkflows(opts.Root)...)
 	out = append(out, checkRulesets(opts.Root)...)
 	return finding.New("doctor", out)
+}
+
+// checkEngine reports an analysis engine that is missing or that this lafke cannot use.
+// A missing engine is informational: only source-code analysis needs it.
+func checkEngine(opts Options) []finding.Finding {
+	if opts.Engine == nil {
+		return nil
+	}
+	_, err := opts.Engine()
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, engine.ErrNotFound):
+		return []finding.Finding{{ID: "engine-missing", Severity: finding.SeverityInfo, Title: "the analysis engine is not installed", Detail: "Source-code analysis (sast, security, chain) needs it; other commands do not.", Remediation: "Run lafke engine install."}}
+	default:
+		return []finding.Finding{{ID: "engine-unusable", Severity: finding.SeverityMedium, Title: "the analysis engine cannot be used", Detail: err.Error(), Remediation: "Run lafke engine update."}}
+	}
 }
 
 func checkLock(opts Options) []finding.Finding {

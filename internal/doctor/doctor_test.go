@@ -1,6 +1,7 @@
 package doctor_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/lafke/lafke/internal/doctor"
+	"github.com/lafke/lafke/internal/engine"
 	"github.com/lafke/lafke/internal/finding"
 )
 
@@ -81,6 +83,24 @@ func TestRunAcceptsSafeSetup(t *testing.T) {
 	got := ids(report)
 	if len(got) != 1 || got[0] != "lock-missing" {
 		t.Fatalf("expected only lock-missing, got %v", got)
+	}
+}
+
+func TestEngineCheck(t *testing.T) {
+	dir := t.TempDir()
+	run := func(err error) finding.Report {
+		return doctor.Run(doctor.Options{Root: dir, Engine: func() (string, error) { return "v1.0.0", err }})
+	}
+	if _, ok := has(run(nil), "engine-"); ok {
+		t.Fatal("a working engine produced a finding")
+	}
+	f, ok := has(run(engine.ErrNotFound), "engine-missing")
+	if !ok || f.Severity != finding.SeverityInfo {
+		t.Fatalf("missing engine: %+v, %v", f, ok)
+	}
+	f, ok = has(run(errors.New("engine protocol 9 is not supported")), "engine-unusable")
+	if !ok || f.Severity != finding.SeverityMedium {
+		t.Fatalf("unusable engine: %+v, %v", f, ok)
 	}
 }
 
