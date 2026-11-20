@@ -38,8 +38,12 @@ Two executables work together:
 The installer runs `lafke engine install` for you (`--skip-engine` leaves it out). That
 command downloads the newest engine that speaks this `lafke`'s protocol, checks its
 sha256 and its GitHub attestation, and keeps it in the user cache. `lafke engine update`
-installs a newer one and removes the old ones, and `lafke engine status` shows which
-engine is in use. Set `LAFKE_ENGINE_VERSION` to pin a version. Releases before the engine
+installs a newer one and removes the old ones, `lafke engine list` shows the published
+releases that fit, and `lafke engine status` shows which engine is in use. An installed
+version is not downloaded again unless you pass `--force`. Set `LAFKE_ENGINE_VERSION` to pin
+a version. `lafke doctor` reports an engine that is missing or that this `lafke` cannot
+use. The GitHub Action installs the engine for `sast` and `security`; its `engine-version`
+input pins a release. Releases before the engine
 was split out shipped it next to `lafke`, and that copy wins over installed ones;
 `lafke engine update` installs the newest engine and removes that copy.
 
