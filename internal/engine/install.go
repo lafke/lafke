@@ -71,6 +71,10 @@ type Installed struct {
 	Version  string `json:"version"`
 	Protocol int    `json:"protocol"`
 	Path     string `json:"-"`
+
+	// Reused is set by Install when the version was already installed and nothing was
+	// downloaded.
+	Reused bool `json:"-"`
 }
 
 // InstallOptions controls Install.
@@ -82,6 +86,9 @@ type InstallOptions struct {
 	// SkipAttestation installs without verifying provenance. The sha256 from the
 	// manifest is still checked.
 	SkipAttestation bool
+
+	// Force downloads the engine again even when that version is already installed.
+	Force bool
 
 	// Token authenticates GitHub requests; empty sends none.
 	Token string
@@ -294,6 +301,18 @@ func Install(ctx context.Context, opts InstallOptions) (Installed, error) {
 	manifestRaw, m, err := resolve(ctx, opts)
 	if err != nil {
 		return Installed{}, err
+	}
+	if !opts.Force {
+		for _, in := range List() {
+			if in.Version != m.Version {
+				continue
+			}
+			// Only an executable that still reports its version counts as installed.
+			if v, err := checkPath(in.Path); err == nil && v == m.Version {
+				in.Reused = true
+				return in, nil
+			}
+		}
 	}
 	name := archiveName()
 	want, ok := m.Archives[name]

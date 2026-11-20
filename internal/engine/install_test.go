@@ -275,3 +275,36 @@ func TestRemoteListsCompatibleReleases(t *testing.T) {
 		t.Fatalf("Remote = %+v, want v1.5.0 then v1.4.0", got)
 	}
 }
+
+func TestInstallReusesInstalledVersionUnlessForced(t *testing.T) {
+	fakeReleases(t, release{"v1.0.0", ProtocolVersion})
+	first, err := Install(context.Background(), InstallOptions{})
+	if err != nil || first.Reused {
+		t.Fatalf("first install = %+v, %v", first, err)
+	}
+	// A marker appended to the script shows whether the executable was replaced.
+	body, err := os.ReadFile(first.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marked := append(body, []byte("# marker\n")...)
+	if err := os.WriteFile(first.Path, marked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := Install(context.Background(), InstallOptions{})
+	if err != nil || !second.Reused || second.Path != first.Path {
+		t.Fatalf("second install = %+v, %v; want a reused install", second, err)
+	}
+	if got, _ := os.ReadFile(first.Path); !bytes.Equal(got, marked) {
+		t.Fatal("a reused install replaced the executable")
+	}
+
+	forced, err := Install(context.Background(), InstallOptions{Force: true})
+	if err != nil || forced.Reused {
+		t.Fatalf("forced install = %+v, %v; want a fresh download", forced, err)
+	}
+	if got, _ := os.ReadFile(first.Path); !bytes.Equal(got, body) {
+		t.Fatal("--force did not replace the executable")
+	}
+}

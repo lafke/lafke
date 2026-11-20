@@ -33,7 +33,7 @@ code work without the engine.`,
 
 func newEngineInstallCommand(opts *options, use, short string) *cobra.Command {
 	var version string
-	var skipAttestation bool
+	var skipAttestation, force bool
 	update := use == "update"
 	cmd := &cobra.Command{
 		Use:   use,
@@ -47,16 +47,21 @@ func newEngineInstallCommand(opts *options, use, short string) *cobra.Command {
 			in, err := engine.Install(cmd.Context(), engine.InstallOptions{
 				Version:         version,
 				SkipAttestation: skipAttestation,
+				Force:           force,
 				Token:           githubToken(),
 				Progress:        func(stage string) { fmt.Fprintln(cmd.ErrOrStderr(), stage) },
 			})
 			if err != nil {
 				return opErr(err)
 			}
-			if skipAttestation {
+			if skipAttestation && !in.Reused {
 				fmt.Fprintln(cmd.ErrOrStderr(), "warning: attestation verification skipped")
 			}
-			fmt.Fprintf(out, "installed lafke-engine %s (protocol %d)\n  %s\n", in.Version, in.Protocol, in.Path)
+			verb := "installed"
+			if in.Reused {
+				verb = "already installed:"
+			}
+			fmt.Fprintf(out, "%s lafke-engine %s (protocol %d)\n  %s\n", verb, in.Version, in.Protocol, in.Path)
 			if update {
 				removed, err := engine.Remove(in.Version)
 				for _, v := range removed {
@@ -80,6 +85,7 @@ func newEngineInstallCommand(opts *options, use, short string) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&skipAttestation, "skip-attestation", false, "install without verifying the GitHub attestation (the sha256 is still checked)")
+	cmd.Flags().BoolVar(&force, "force", false, "download the engine again even when that version is already installed")
 	if !update {
 		cmd.Flags().StringVar(&version, "version", "", "engine release tag to install (default: newest compatible)")
 	}
