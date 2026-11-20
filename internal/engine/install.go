@@ -206,6 +206,50 @@ func fetchManifest(ctx context.Context, tag, token string) ([]byte, Manifest, er
 	return raw, m, nil
 }
 
+// releaseTags lists the published release tags of the engine repository, newest first.
+func releaseTags(ctx context.Context, token string) ([]string, error) {
+	body, err := httpGet(ctx, releasesAPI+"?per_page=30", token, maxManifest)
+	if err != nil {
+		return nil, err
+	}
+	var releases []struct {
+		Tag        string `json:"tag_name"`
+		Draft      bool   `json:"draft"`
+		Prerelease bool   `json:"prerelease"`
+	}
+	if err := json.Unmarshal(body, &releases); err != nil {
+		return nil, fmt.Errorf("invalid release list: %w", err)
+	}
+	var tags []string
+	for _, r := range releases {
+		if !r.Draft && !r.Prerelease && semver.IsValid(r.Tag) {
+			tags = append(tags, r.Tag)
+		}
+	}
+	sort.Slice(tags, func(i, j int) bool { return semver.Compare(tags[i], tags[j]) > 0 })
+	return tags, nil
+}
+
+// Remote returns the published engine releases that speak this CLI's protocol and have a
+// build for this platform, newest first.
+func Remote(ctx context.Context, token string) ([]Manifest, error) {
+	tags, err := releaseTags(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	var out []Manifest
+	for _, tag := range tags {
+		_, m, err := fetchManifest(ctx, tag, token)
+		if err != nil || m.Protocol != ProtocolVersion {
+			continue
+		}
+		if _, ok := m.Archives[archiveName()]; ok {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
 // resolve finds the manifest to install: the requested tag, or the newest release whose
 // protocol this CLI speaks.
 func resolve(ctx context.Context, opts InstallOptions) ([]byte, Manifest, error) {
@@ -224,28 +268,13 @@ func resolve(ctx context.Context, opts InstallOptions) ([]byte, Manifest, error)
 		return raw, m, nil
 	}
 	// The latest release may speak a newer protocol; look for the newest one that fits.
-	body, lerr := httpGet(ctx, releasesAPI+"?per_page=30", opts.Token, maxManifest)
+	tags, lerr := releaseTags(ctx, opts.Token)
 	if lerr != nil {
 		if err != nil {
 			return nil, Manifest{}, err
 		}
 		return nil, Manifest{}, lerr
 	}
-	var releases []struct {
-		Tag        string `json:"tag_name"`
-		Draft      bool   `json:"draft"`
-		Prerelease bool   `json:"prerelease"`
-	}
-	if err := json.Unmarshal(body, &releases); err != nil {
-		return nil, Manifest{}, fmt.Errorf("invalid release list: %w", err)
-	}
-	var tags []string
-	for _, r := range releases {
-		if !r.Draft && !r.Prerelease && semver.IsValid(r.Tag) {
-			tags = append(tags, r.Tag)
-		}
-	}
-	sort.Slice(tags, func(i, j int) bool { return semver.Compare(tags[i], tags[j]) > 0 })
 	for _, tag := range tags {
 		raw, m, err := fetchManifest(ctx, tag, opts.Token)
 		if err == nil && m.Protocol == ProtocolVersion {

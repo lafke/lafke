@@ -260,3 +260,18 @@ func TestBundledIsPreferredOverInstalled(t *testing.T) {
 		t.Fatalf("Locate = %q, %v; want the installed engine", p, err)
 	}
 }
+
+func TestRemoteListsCompatibleReleases(t *testing.T) {
+	fakeReleases(t,
+		release{"v2.0.0", ProtocolVersion + 1},
+		release{"v1.5.0", ProtocolVersion},
+		release{"v1.4.0", ProtocolVersion},
+	)
+	got, err := Remote(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Version != "v1.5.0" || got[1].Version != "v1.4.0" {
+		t.Fatalf("Remote = %+v, want v1.5.0 then v1.4.0", got)
+	}
+}

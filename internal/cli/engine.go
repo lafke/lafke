@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/lafke/lafke/internal/engine"
 	"github.com/spf13/cobra"
@@ -26,6 +27,7 @@ code work without the engine.`,
 	cmd.AddCommand(newEngineInstallCommand(opts, "install", "Download and install the engine"))
 	cmd.AddCommand(newEngineInstallCommand(opts, "update", "Install the newest compatible engine and remove older ones"))
 	cmd.AddCommand(newEngineStatusCommand())
+	cmd.AddCommand(newEngineListCommand(opts))
 	return cmd
 }
 
@@ -111,6 +113,47 @@ func newEngineStatusCommand() *cobra.Command {
 			}
 			for _, in := range installed {
 				fmt.Fprintf(out, "  %s\n", in.Version)
+			}
+			return nil
+		},
+	}
+}
+
+func newEngineListCommand(opts *options) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List the published engine releases that speak this lafke's protocol",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.offline || opts.network == "offline" {
+				return opErr(errors.New("cannot list engine releases in offline mode"))
+			}
+			releases, err := engine.Remote(cmd.Context(), githubToken())
+			if err != nil {
+				return opErr(err)
+			}
+			out := cmd.OutOrStdout()
+			if len(releases) == 0 {
+				fmt.Fprintf(out, "no engine release speaks protocol %d\n", engine.ProtocolVersion)
+				return nil
+			}
+			installed := map[string]bool{}
+			for _, in := range engine.List() {
+				installed[in.Version] = true
+			}
+			for i, m := range releases {
+				var notes []string
+				if i == 0 {
+					notes = append(notes, "newest")
+				}
+				if installed[m.Version] {
+					notes = append(notes, "installed")
+				}
+				line := m.Version
+				if len(notes) > 0 {
+					line += " (" + strings.Join(notes, ", ") + ")"
+				}
+				fmt.Fprintln(out, line)
 			}
 			return nil
 		},
