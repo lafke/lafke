@@ -17,7 +17,8 @@ func newEngineCommand(opts *options) *cobra.Command {
 ` + engine.ReleasesRepo + `. install downloads the newest engine that speaks this
 lafke's protocol, checks its sha256 and its GitHub provenance attestation, and keeps it
 in the user cache. lafke finds it there when no engine sits next to it or is set with
-` + engine.EnvPath + `.
+` + engine.EnvPath + `. update also removes an engine left next to the executable by older
+releases, since that one would take precedence.
 
 Set ` + engine.EnvVersion + ` to pin a version for a run. Commands that do not analyze source
 code work without the engine.`,
@@ -62,6 +63,16 @@ func newEngineInstallCommand(opts *options, use, short string) *cobra.Command {
 				if err != nil {
 					return opErr(err)
 				}
+				if bundled, ok := engine.Bundled(); ok {
+					// It would win over the engine just installed, so it has to go.
+					if err := os.Remove(bundled); err != nil {
+						fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s still takes precedence over the installed engine; remove it manually: %v\n", bundled, err)
+					} else {
+						fmt.Fprintf(out, "removed %s\n", bundled)
+					}
+				}
+			} else {
+				warnBundled(cmd)
 			}
 			return nil
 		},
@@ -92,6 +103,7 @@ func newEngineStatusCommand() *cobra.Command {
 					fmt.Fprintf(out, "engine:   %s (%s)\n", path, version)
 				}
 			}
+			warnBundled(cmd)
 			installed := engine.List()
 			fmt.Fprintf(out, "installed in %s:\n", engine.InstallDir())
 			if len(installed) == 0 {
@@ -102,6 +114,13 @@ func newEngineStatusCommand() *cobra.Command {
 			}
 			return nil
 		},
+	}
+}
+
+// warnBundled tells the user when an engine next to the executable overrides installed ones.
+func warnBundled(cmd *cobra.Command) {
+	if bundled, ok := engine.Bundled(); ok {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s takes precedence over installed engines; run `lafke engine update` to replace it\n", bundled)
 	}
 }
 

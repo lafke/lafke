@@ -225,3 +225,38 @@ func TestRemove(t *testing.T) {
 		t.Fatalf("List = %+v", list)
 	}
 }
+
+func TestBundledIsPreferredOverInstalled(t *testing.T) {
+	fakeReleases(t, release{"v1.0.0", ProtocolVersion})
+	if _, err := Install(context.Background(), InstallOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	bundled := filepath.Join(filepath.Dir(exe), executableName())
+	if _, err := os.Stat(bundled); err == nil {
+		t.Skip("an engine already sits next to the test executable")
+	}
+	if _, ok := Bundled(); ok {
+		t.Fatal("Bundled found an engine that is not there")
+	}
+	if err := os.WriteFile(bundled, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(bundled)
+	if p, ok := Bundled(); !ok || p != bundled {
+		t.Fatalf("Bundled = %q, %v", p, ok)
+	}
+	if p, err := Locate(); err != nil || p != bundled {
+		t.Fatalf("Locate = %q, %v; want the bundled engine", p, err)
+	}
+	os.Remove(bundled)
+	if p, err := Locate(); err != nil || !strings.Contains(p, "v1.0.0") {
+		t.Fatalf("Locate = %q, %v; want the installed engine", p, err)
+	}
+}

@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/lafke/lafke/internal/finding"
@@ -66,10 +65,7 @@ func Locate() (string, error) {
 		}
 		return p, nil
 	}
-	name := binaryName
-	if runtime.GOOS == "windows" {
-		name += ".exe"
-	}
+	name := executableName()
 	// A pinned version overrides every other location.
 	if pin := os.Getenv(EnvVersion); pin != "" {
 		if p, ok := installedPath(); ok {
@@ -77,14 +73,8 @@ func Locate() (string, error) {
 		}
 		return "", fmt.Errorf("lafke-engine %s is not installed: run `lafke engine install --version %s`", pin, pin)
 	}
-	if exe, err := os.Executable(); err == nil {
-		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-			exe = resolved
-		}
-		candidate := filepath.Join(filepath.Dir(exe), name)
-		if st, err := os.Stat(candidate); err == nil && !st.IsDir() {
-			return candidate, nil
-		}
+	if p, ok := Bundled(); ok {
+		return p, nil
 	}
 	if p, ok := installedPath(); ok {
 		return p, nil
@@ -93,6 +83,24 @@ func Locate() (string, error) {
 		return p, nil
 	}
 	return "", ErrNotFound
+}
+
+// Bundled returns the engine that sits next to the lafke executable, the layout of
+// releases that shipped the engine in the same archive. Locate prefers it over the engines
+// installed by Install, so a stale one keeps being used until it is removed.
+func Bundled() (string, bool) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", false
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	candidate := filepath.Join(filepath.Dir(exe), executableName())
+	if st, err := os.Stat(candidate); err != nil || st.IsDir() {
+		return "", false
+	}
+	return candidate, true
 }
 
 // Available reports whether an engine executable can be located.

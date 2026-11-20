@@ -39,7 +39,9 @@ The installer runs `lafke engine install` for you (`--skip-engine` leaves it out
 command downloads the newest engine that speaks this `lafke`'s protocol, checks its
 sha256 and its GitHub attestation, and keeps it in the user cache. `lafke engine update`
 installs a newer one and removes the old ones, and `lafke engine status` shows which
-engine is in use. Set `LAFKE_ENGINE_VERSION` to pin a version.
+engine is in use. Set `LAFKE_ENGINE_VERSION` to pin a version. Releases before the engine
+was split out shipped it next to `lafke`, and that copy wins over installed ones;
+`lafke engine update` installs the newest engine and removes that copy.
 
 `lafke` looks for the engine in this order: `LAFKE_ENGINE`, the directory of its own
 executable, the engines installed by `lafke engine install`, then `PATH`. Commands that
