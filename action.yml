@@ -56,6 +56,9 @@ inputs:
   version:
     description: Lafke release tag to install. Empty uses a v* action ref, otherwise builds from source.
     default: ""
+  engine-version:
+    description: "Analysis engine release tag to install and use, such as v1.2.0. Empty installs the newest engine that speaks this lafke's protocol. The engine is installed only for sast and security, or when this is set."
+    default: ""
 outputs:
   sarif-file:
     description: Path of the SARIF report, when sarif is enabled
@@ -118,11 +121,26 @@ runs:
         VERSION: ${{ steps.mode.outputs.version }}
         INSTALL_DIR: ${{ runner.temp }}/lafke-bin
         REPO: ${{ github.action_repository }}
+        SKIP_ENGINE: "1"
       run: |
         set -euo pipefail
         mkdir -p "$INSTALL_DIR"
         "${GITHUB_ACTION_PATH}/scripts/install.sh"
         echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+    - name: Install analysis engine
+      if: ${{ inputs.command == 'sast' || inputs.command == 'security' || inputs.engine-version != '' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        ENGINE_VERSION: ${{ inputs.engine-version }}
+      run: |
+        set -euo pipefail
+        args=()
+        if [ -n "$ENGINE_VERSION" ]; then
+          args+=(--version "$ENGINE_VERSION")
+          echo "LAFKE_ENGINE_VERSION=${ENGINE_VERSION}" >> "$GITHUB_ENV"
+        fi
+        lafke engine install ${args[@]+"${args[@]}"}
     - name: Run lafke
       id: run
       shell: bash
