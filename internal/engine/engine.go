@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/lafke/lafke/internal/finding"
 )
@@ -207,6 +208,8 @@ func SecretContent(rel string, src []byte) []finding.Finding {
 	return SecretContents([]string{rel}, [][]byte{src})[0]
 }
 
+var secretsWarning sync.Once
+
 // SecretContents scans several files in one engine run; the result matches the input
 // order. Files that cannot be scanned yield no findings.
 func SecretContents(names []string, contents [][]byte) [][]finding.Finding {
@@ -216,7 +219,18 @@ func SecretContents(names []string, contents [][]byte) [][]finding.Finding {
 		req.Files = append(req.Files, file{Name: n, Content: contents[i]})
 	}
 	var res [][]finding.Finding
-	if err := call("secrets", req, nil, &res); err != nil || len(res) != len(names) {
+	err := call("secrets", req, nil, &res)
+	if err == nil && len(res) != len(names) {
+		err = fmt.Errorf("engine returned %d results for %d files", len(res), len(names))
+	}
+	if err != nil {
+		// A missing engine is reported where it is required; any other failure would
+		// otherwise look like a scan that found nothing.
+		if !errors.Is(err, ErrNotFound) {
+			secretsWarning.Do(func() {
+				fmt.Fprintf(os.Stderr, "lafke: secret scan skipped, engine failed: %v\n", err)
+			})
+		}
 		return out
 	}
 	return res
