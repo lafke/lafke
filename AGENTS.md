@@ -70,7 +70,7 @@ committing as if it passed.
 - Match the surrounding code: naming, comment density, idiom.
 - Keep changes small and focused. No drive-by refactors.
 - Code, comments, commit messages, and everything published to GitHub are in English.
-- Every commit message follows Conventional Commits, is all lowercase, and is 40 to 50
+- Every commit message follows Conventional Commits, is all lowercase, and is 35 to 55
   characters long, counting the whole subject line (e.g. `fix(cli): handle an empty lockfile gracefully`).
   Check the length before committing.
 - A change to a request or response of the engine protocol that an engine or CLI of the
