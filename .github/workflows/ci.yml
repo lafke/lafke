@@ -27,9 +27,10 @@ jobs:
           go-version-file: go.mod
       - name: Build engine
         if: env.HAS_ENGINE_TOKEN == 'true'
+        # The engine can require a newer Go than this module, so let it fetch its own.
         run: |
           git clone --depth 1 "https://x-access-token:${{ secrets.ENGINE_REPO_TOKEN }}@github.com/lafke/engine.git" "$RUNNER_TEMP/engine"
-          (cd "$RUNNER_TEMP/engine" && go build -o "$RUNNER_TEMP/lafke-engine" ./cmd/lafke-engine)
+          (cd "$RUNNER_TEMP/engine" && GOTOOLCHAIN=auto go build -o "$RUNNER_TEMP/lafke-engine" ./cmd/lafke-engine)
           echo "LAFKE_ENGINE=$RUNNER_TEMP/lafke-engine" >> "$GITHUB_ENV"
       - name: Test
         run: go test ./...
