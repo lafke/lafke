@@ -56,7 +56,8 @@ for d in examples/*/; do go run ./cmd/lafke verify --offline "$d"; done
 
 Tests that need the analysis engine are skipped unless `LAFKE_ENGINE` points to a
 built `lafke-engine`. Build one from a checkout of the engine repository:
-`go build -o /tmp/lafke-engine ./cmd/lafke-engine`.
+`cargo build --release --manifest-path rust/Cargo.toml`, which writes
+`rust/target/release/lafke-engine`.
 
 ## Before you commit
 
