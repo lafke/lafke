@@ -30,8 +30,8 @@ jobs:
         run: |
           git clone --depth 1 "https://x-access-token:${{ secrets.ENGINE_REPO_TOKEN }}@github.com/lafke/engine.git" "$RUNNER_TEMP/engine"
           rustup toolchain install stable --profile minimal
-          cargo build --release --locked --manifest-path "$RUNNER_TEMP/engine/rust/Cargo.toml"
-          cp "$RUNNER_TEMP/engine/rust/target/release/lafke-engine" "$RUNNER_TEMP/lafke-engine"
+          cargo build --release --locked --manifest-path "$RUNNER_TEMP/engine/Cargo.toml"
+          cp "$RUNNER_TEMP/engine/target/release/lafke-engine" "$RUNNER_TEMP/lafke-engine"
           echo "LAFKE_ENGINE=$RUNNER_TEMP/lafke-engine" >> "$GITHUB_ENV"
       - name: Test
         run: go test ./...
